@@ -501,6 +501,15 @@ app.post('/api/assets/:kind/:tag/restore', requireAuth, requireRole(['ADMIN', 'E
 // =====================================================================
 // SETTINGS ENDPOINTS (Company Details, Tag Rules, Themes, Custom Fields)
 // =====================================================================
+app.get('/api/branding', async (req, res) => {
+  const branding = await prisma.appSetting.findMany({
+    where: { key: { in: ['companyName', 'companyAddress', 'companyLogo'] } }
+  });
+  const result = {};
+  branding.forEach(setting => { result[setting.key] = setting.value; });
+  res.json(result);
+});
+
 app.get('/api/settings', requireAuth, async (req, res) => {
   const settings = await prisma.appSetting.findMany();
   const map = {};
@@ -513,6 +522,29 @@ app.post('/api/settings', requireAuth, requireRole(['ADMIN']), async (req, res) 
   if (typeof payload !== 'object' || payload === null) {
     throw httpError(400, 'Invalid settings payload.', 'VALIDATION_ERROR');
   }
+  if (Object.hasOwn(payload, 'companyName')) {
+    const companyName = String(payload.companyName).trim();
+    if (!companyName || companyName.length > 120) {
+      throw httpError(400, 'Company name is required and must be 120 characters or fewer.', 'VALIDATION_ERROR');
+    }
+    payload.companyName = companyName;
+  }
+  if (Object.hasOwn(payload, 'companyAddress')) {
+    const companyAddress = String(payload.companyAddress).trim();
+    if (companyAddress.length > 300) {
+      throw httpError(400, 'Company address must be 300 characters or fewer.', 'VALIDATION_ERROR');
+    }
+    payload.companyAddress = companyAddress;
+  }
+  if (Object.hasOwn(payload, 'companyLogo')) {
+    const companyLogo = String(payload.companyLogo || '');
+    const supportedLogo = /^data:image\/(png|jpeg|gif);base64,[a-z0-9+/=\r\n]+$/i;
+    if (companyLogo && (!supportedLogo.test(companyLogo) || companyLogo.length > 3_000_000)) {
+      throw httpError(400, 'Logo must be a PNG, JPG, or GIF image no larger than 2 MB.', 'VALIDATION_ERROR');
+    }
+    payload.companyLogo = companyLogo;
+  }
+
   await prisma.$transaction(async tx => {
     for (const [key, value] of Object.entries(payload)) {
       await tx.appSetting.upsert({

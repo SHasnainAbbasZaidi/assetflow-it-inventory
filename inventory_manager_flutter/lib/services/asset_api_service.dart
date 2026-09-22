@@ -127,6 +127,7 @@ class AssetApiService {
   Future<List<dynamic>> getPeripherals() async => await _get('/api/peripherals') as List<dynamic>;
   Future<List<dynamic>> getUsers() async => await _get('/api/users') as List<dynamic>;
   Future<List<dynamic>> getLogs() async => await _get('/api/logs') as List<dynamic>;
+  Future<Map<String, dynamic>> getSettings() async => await _get('/api/settings') as Map<String, dynamic>;
 
   Future<Map<String, dynamic>> createWorkstation(Map<String, dynamic> data) async => await _post('/api/workstations', data) as Map<String, dynamic>;
   Future<Map<String, dynamic>> updateWorkstation(String tag, Map<String, dynamic> data) async => await _patch('/api/workstations/${Uri.encodeComponent(tag)}', data) as Map<String, dynamic>;

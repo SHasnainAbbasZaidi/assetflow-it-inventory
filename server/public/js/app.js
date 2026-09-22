@@ -5,6 +5,8 @@ let token = localStorage.getItem('assetflow_token') || null;
 let currentUser = JSON.parse(localStorage.getItem('assetflow_user') || 'null');
 let currentTab = 'dashboard';
 let currentSettingsSubTab = 'company';
+let pendingCompanyLogo = null;
+const defaultAppFavicon = document.getElementById('appFavicon')?.getAttribute('href') || '';
 
 // In-memory data store
 let data = {
@@ -88,10 +90,23 @@ function closeModal(id) {
 }
 
 // Setup & Initialization
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    await loadPublicBranding();
     initAuth();
     setupEventListeners();
 });
+
+async function loadPublicBranding() {
+    try {
+        const response = await fetch('/api/branding', { headers: { 'Accept': 'application/json' } });
+        if (!response.ok) return;
+        const branding = await response.json();
+        data.settings = { ...data.settings, ...branding };
+        applySettingsToUI();
+    } catch (err) {
+        console.warn('Unable to load public branding:', err);
+    }
+}
 
 function initAuth() {
     const loginScreen = document.getElementById('loginScreen');
@@ -130,9 +145,33 @@ function applyRBAC() {
 }
 
 function applySettingsToUI() {
-    if (data.settings.companyName) {
-        document.getElementById('companyHeaderTitle').textContent = data.settings.companyName;
-    }
+    document.documentElement.dataset.theme = ['dark', 'midnight', 'onyx'].includes(data.settings.themeMode) ? data.settings.themeMode : 'dark';
+    if (/^#[0-9a-f]{6}$/i.test(data.settings.accentColor || '')) document.documentElement.style.setProperty('--accent', data.settings.accentColor);
+    const companyName = data.settings.companyName?.trim() || 'AssetFlow';
+    const companyLogo = getCompanyLogo();
+
+    document.getElementById('companyHeaderTitle').textContent = companyName;
+    document.getElementById('loginCompanyName').textContent = companyName;
+    document.title = `${companyName} — IT Asset Inventory & Personnel Management`;
+
+    applyBrandImage('companyHeaderLogoImage', 'companyHeaderLogoFallback', companyLogo);
+    applyBrandImage('loginBrandLogoImage', 'loginBrandLogoFallback', companyLogo);
+
+    const favicon = document.getElementById('appFavicon');
+    if (favicon) favicon.href = companyLogo || defaultAppFavicon;
+}
+
+function getCompanyLogo(value = data.settings.companyLogo) {
+    return typeof value === 'string' && /^data:image\/(png|jpeg|gif);base64,/i.test(value) ? value : '';
+}
+
+function applyBrandImage(imageId, fallbackId, logo) {
+    const image = document.getElementById(imageId);
+    const fallback = document.getElementById(fallbackId);
+    if (!image || !fallback) return;
+    image.hidden = !logo;
+    fallback.hidden = Boolean(logo);
+    if (logo) image.src = logo;
 }
 
 function handleLogout() {
@@ -254,6 +293,7 @@ async function loadAllData() {
         data.personnel = results[2] || [];
         data.logs = results[3] || [];
         data.settings = results[4] || {};
+        applySettingsToUI();
         data.customFields = results[5] || [];
         if (currentUser?.role === 'ADMIN') {
             data.users = results[6] || [];
@@ -910,6 +950,7 @@ function renderSettings(container) {
                 <button class="subnav-btn ${currentSettingsSubTab === 'tags' ? 'active' : ''}" onclick="switchSettingsSubTab('tags')">
                     <i class="ph ph-barcode"></i> Custom Tag Generator
                 </button>
+                <button class="subnav-btn ${currentSettingsSubTab === 'tag-design' ? 'active' : ''}" onclick="switchSettingsSubTab('tag-design')"><i class="ph ph-pencil-ruler"></i> Tag Customizer</button>
                 <button class="subnav-btn ${currentSettingsSubTab === 'custom-fields' ? 'active' : ''}" onclick="switchSettingsSubTab('custom-fields')">
                     <i class="ph ph-sliders"></i> Custom Field Creator
                 </button>
@@ -944,24 +985,57 @@ function switchSettingsSubTab(subTab) {
 function renderSettingsSubPane() {
     const pane = document.getElementById('settingsPaneContainer');
     if (!pane) return;
+    if (currentSettingsSubTab === 'themes') {
+        pane.innerHTML = `<div class="settings-pane"><h3>Themes & Personalization</h3><form onsubmit="saveThemeSettings(event)" class="branding-fields">
+          <div class="form-group"><label for="themeMode">Theme</label><select id="themeMode">${[['dark','Dark Nebula'],['midnight','Midnight Blue'],['onyx','Onyx Minimal']].map(([value,label]) => `<option value="${value}" ${data.settings.themeMode === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
+          <div class="form-group"><label for="accentColor">Accent color</label><input type="color" id="accentColor" value="${/^#[0-9a-f]{6}$/i.test(data.settings.accentColor || '') ? data.settings.accentColor : '#6366f1'}"></div>
+          <button class="btn btn-primary" type="submit">Save Theme</button></form></div>`;
+        return;
+    }
+    if (currentSettingsSubTab === 'tag-design') {
+        const config = getTagConfig();
+        pane.innerHTML = `<div class="settings-pane"><h3>Tag Customizer</h3><p>Customize printed tags. Existing asset numbers remain unchanged.</p><form class="branding-fields" onsubmit="saveTagDesign(event)">
+          ${[['showCompany','Company logo, name and address'],['showDeviceName','Device details'],['showUser','Assigned user']].map(([key,label]) => `<label><input type="checkbox" id="${key}" ${config[key] ? 'checked' : ''}> ${label}</label>`).join('')}
+          <div class="form-group"><label for="tagQrSize">QR code size (50–120 px)</label><input id="tagQrSize" type="number" min="50" max="120" value="${config.qrSize}" required></div>
+          <button class="btn btn-primary" type="submit">Save Tag Design</button></form></div>`;
+        return;
+    }
 
     if (currentSettingsSubTab === 'company') {
+        const companyLogo = getCompanyLogo(pendingCompanyLogo === null ? data.settings.companyLogo : pendingCompanyLogo);
         pane.innerHTML = `
-            <div class="settings-pane">
+            <div class="settings-pane branding-settings-pane">
                 <div>
-                    <h3 style="font-size: 18px; margin-bottom: 6px;">Company Details & Branding</h3>
-                    <p style="font-size: 13px; color: var(--text-secondary);">These details appear on printed asset tags, export headers, and the top application banner.</p>
+                    <h3>Company Branding</h3>
+                    <p>Upload, change, or remove the company logo used across the application, reports, and asset tags.</p>
                 </div>
                 <form id="companySettingsForm" onsubmit="saveCompanySettings(event)">
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label>Company / Organization Name</label>
-                        <input type="text" id="settingCompanyName" value="${escapeHtml(data.settings.companyName || 'AssetFlow Enterprise')}">
+                    <input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/gif" onchange="handleCompanyLogoFile(event)" hidden>
+                    <button type="button" class="branding-upload-zone" onclick="document.getElementById('companyLogoInput').click()">
+                        ${companyLogo ? `
+                            <img src="${companyLogo}" alt="Company logo preview">
+                            <span>Click to upload or change logo image</span>
+                        ` : `
+                            <i class="ph ph-cloud-arrow-up"></i>
+                            <span>Click to upload or change logo image</span>
+                        `}
+                        <small>Supports PNG, JPG, GIF · Maximum 2 MB</small>
+                    </button>
+                    <div class="branding-fields">
+                        <div class="form-group">
+                            <label class="sr-only" for="settingCompanyName">Company Name</label>
+                            <input type="text" id="settingCompanyName" maxlength="120" required placeholder="Company Name" value="${escapeHtml(data.settings.companyName || 'AssetFlow Enterprise')}">
+                        </div>
+                        <div class="form-group">
+                            <label class="sr-only" for="settingCompanyAddress">Company Address</label>
+                            <textarea id="settingCompanyAddress" maxlength="300" rows="2" placeholder="Company Address">${escapeHtml(data.settings.companyAddress || 'Headquarters, Innovation Way')}</textarea>
+                        </div>
                     </div>
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label>Headquarters / Physical Address</label>
-                        <input type="text" id="settingCompanyAddress" value="${escapeHtml(data.settings.companyAddress || 'Headquarters, Innovation Way')}">
+                    <div class="branding-actions">
+                        <button type="button" class="btn btn-secondary" onclick="document.getElementById('companyLogoInput').click()"><i class="ph ph-pencil-simple"></i> Edit / Change Logo</button>
+                        <button type="button" class="btn btn-danger-outline" onclick="removeCompanyLogo()" ${companyLogo ? '' : 'disabled'}><i class="ph ph-trash"></i> Remove Logo</button>
+                        <button type="submit" class="btn btn-primary"><i class="ph ph-floppy-disk"></i> Save Settings</button>
                     </div>
-                    <button type="submit" class="btn btn-primary"><i class="ph ph-floppy-disk"></i> Save Branding Settings</button>
                 </form>
             </div>
         `;
@@ -979,6 +1053,7 @@ function renderSettingsSubPane() {
                     <p style="font-size: 13px; color: var(--text-secondary);">Configure prefix patterns, separators, and sequence formatting for one-click asset tag generation.</p>
                 </div>
                 <form id="tagRulesForm" onsubmit="saveTagSettings(event)">
+                    <div class="form-group"><label for="settingTagSeqLength">Minimum sequence digits</label><input id="settingTagSeqLength" type="number" min="1" max="10" value="${escapeHtml(seqLen)}" required></div>
                     <div class="form-row" style="margin-bottom: 16px;">
                         <div class="form-group">
                             <label>Workstation Prefix</label>
@@ -1153,20 +1228,103 @@ function updateTagPreview() {
     }
 }
 
+function nextAssetTag(kind) {
+    const ws = kind === 'workstation';
+    const prefix = data.settings[ws ? 'tagPrefixWs' : 'tagPrefixPer'] || (ws ? 'WS' : 'PER');
+    const stem = prefix + (data.settings.tagSeparator ?? '-');
+    const digits = Math.max(1, Math.min(10, Number(data.settings.tagSeqLength) || 4));
+    const tags = (ws ? data.workstations : data.peripherals).map(item => item[ws ? 'workstationTag' : 'peripheralTag']);
+    let next = Math.max(1, Number(data.settings.tagSeqStart) || (ws ? 1001 : 2001));
+    for (const tag of tags) {
+        const suffix = tag.startsWith(stem) ? tag.slice(stem.length) : '';
+        if (/^\d+$/.test(suffix)) next = Math.max(next, Number(suffix) + 1);
+    }
+    return stem + String(next).padStart(digits, '0');
+}
+
+function getTagConfig() {
+    let config = {};
+    try { config = JSON.parse(data.settings.tagConfig || '{}'); } catch (_) {}
+    return { showCompany: config.showCompany !== false, showUser: config.showUser !== false,
+        showDeviceName: config.showDeviceName !== false, qrSize: Math.max(50, Math.min(120, Number(config.qrSize) || 70)) };
+}
+
+async function saveTagDesign(event) {
+    event.preventDefault();
+    const config = {};
+    for (const key of ['showCompany', 'showUser', 'showDeviceName']) config[key] = document.getElementById(key).checked;
+    config.qrSize = Number(document.getElementById('tagQrSize').value);
+    try {
+        await api('/api/settings', { method: 'POST', body: { tagConfig: JSON.stringify(config) } });
+        data.settings.tagConfig = JSON.stringify(config);
+        showToast('Tag design saved', 'success');
+    } catch (_) {}
+}
+
+async function saveThemeSettings(event) {
+    event.preventDefault();
+    const settings = { themeMode: document.getElementById('themeMode').value, accentColor: document.getElementById('accentColor').value };
+    try {
+        await api('/api/settings', { method: 'POST', body: settings });
+        Object.assign(data.settings, settings);
+        applySettingsToUI();
+        showToast('Theme saved', 'success');
+    } catch (_) {}
+}
+
 async function saveCompanySettings(e) {
     e.preventDefault();
     const companyName = document.getElementById('settingCompanyName').value.trim();
     const companyAddress = document.getElementById('settingCompanyAddress').value.trim();
+    const companyLogo = pendingCompanyLogo === null ? (data.settings.companyLogo || '') : pendingCompanyLogo;
 
     try {
         await api('/api/settings', {
             method: 'POST',
-            body: { companyName, companyAddress }
+            body: { companyName, companyAddress, companyLogo }
         });
         showToast('Company branding settings saved!', 'success');
+        pendingCompanyLogo = null;
         await loadAllData();
         applySettingsToUI();
+        renderSettingsSubPane();
     } catch (err) {}
+}
+
+function handleCompanyLogoFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!['image/png', 'image/jpeg', 'image/gif'].includes(file.type)) {
+        showToast('Please select a PNG, JPG, or GIF image.', 'error');
+        event.target.value = '';
+        return;
+    }
+    if (file.size > 2 * 1024 * 1024) {
+        showToast('Logo image must be 2 MB or smaller.', 'error');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+        const name = document.getElementById('settingCompanyName').value;
+        const address = document.getElementById('settingCompanyAddress').value;
+        pendingCompanyLogo = String(reader.result || '');
+        renderSettingsSubPane();
+        document.getElementById('settingCompanyName').value = name;
+        document.getElementById('settingCompanyAddress').value = address;
+    };
+    reader.onerror = () => showToast('Unable to read the selected logo image.', 'error');
+    reader.readAsDataURL(file);
+}
+
+function removeCompanyLogo() {
+    const name = document.getElementById('settingCompanyName').value;
+    const address = document.getElementById('settingCompanyAddress').value;
+    pendingCompanyLogo = '';
+    renderSettingsSubPane();
+    document.getElementById('settingCompanyName').value = name;
+    document.getElementById('settingCompanyAddress').value = address;
 }
 
 async function saveTagSettings(e) {
@@ -1179,7 +1337,7 @@ async function saveTagSettings(e) {
     try {
         await api('/api/settings', {
             method: 'POST',
-            body: { tagPrefixWs, tagPrefixPer, tagSeparator, tagSeqStart }
+            body: { tagPrefixWs, tagPrefixPer, tagSeparator, tagSeqStart, tagSeqLength: document.getElementById('settingTagSeqLength').value }
         });
         showToast('Automated tag rules saved!', 'success');
         await loadAllData();
@@ -1628,8 +1786,7 @@ function openWorkstationModal(tag = null) {
         // Auto-generate tag if rule exists
         const prefix = data.settings.tagPrefixWs || 'WS';
         const sep = data.settings.tagSeparator || '-';
-        const nextNum = (data.workstations.length + 1001);
-        document.getElementById('wsTag').value = `${prefix}${sep}${nextNum}`;
+        document.getElementById('wsTag').value = nextAssetTag('workstation');
     }
     openModal('workstationModal');
 }
@@ -1714,8 +1871,7 @@ function openPeripheralModal(tag = null) {
         // Auto-generate tag if rule exists
         const prefix = data.settings.tagPrefixPer || 'PER';
         const sep = data.settings.tagSeparator || '-';
-        const nextNum = (data.peripherals.length + 2001);
-        document.getElementById('perTag').value = `${prefix}${sep}${nextNum}`;
+        document.getElementById('perTag').value = nextAssetTag('peripheral');
     }
     openModal('peripheralModal');
 }
@@ -1788,7 +1944,20 @@ async function restoreAsset(kind, tag) {
 // Print Tag Helper
 function printTag(tag, type) {
     const area = document.getElementById('printableTagArea');
-    const companyLogo = data.settings.companyLogo ? `<img src="${data.settings.companyLogo}" style="width: 32px; height: 32px; object-fit: contain; margin-top: 4px;">` : `<span class="logo">${data.settings.companyName || 'AssetFlow'}</span>`;
+    const companyName = escapeHtml(data.settings.companyName || 'AssetFlow');
+    const companyAddress = escapeHtml(data.settings.companyAddress || '');
+    const companyLogo = getCompanyLogo();
+    const brandMark = companyLogo
+        ? `<img src="${companyLogo}" alt="${companyName} logo">`
+        : `<span class="tag-brand-fallback"><i class="ph ph-hexagon"></i></span>`;
+    const brandHeader = `
+        <div class="tag-brand-header">
+            <div class="tag-brand-mark">${brandMark}</div>
+            <div class="tag-brand-copy">
+                <strong>${companyName}</strong>
+                ${companyAddress ? `<span>${companyAddress}</span>` : ''}
+            </div>
+        </div>`;
 
     if (type === 'workstation') {
         const ws = data.workstations.find(w => w.workstationTag === tag);
@@ -1797,8 +1966,9 @@ function printTag(tag, type) {
         
         area.innerHTML = `
             <div class="tag tag-large print-only-tag">
+                ${brandHeader}
                 <div class="tag-title">Device Details</div>
-                <div class="qr-box"><div id="printQrCode"></div>${companyLogo}</div>
+                <div class="qr-box"><div id="printQrCode"></div></div>
                 <div class="field-row"><span class="field-label">Username:</span><span class="field-value">${escapeHtml(assignedName)}</span></div>
                 <div class="field-row"><span class="field-label">CPU:</span><span class="field-value">${escapeHtml(ws.processorGen || '')}</span></div>
                 <div class="field-row"><span class="field-label">Motherboard:</span><span class="field-value">${escapeHtml(ws.motherboard || '')}</span></div>
@@ -1815,8 +1985,9 @@ function printTag(tag, type) {
 
         area.innerHTML = `
             <div class="tag tag-small print-only-tag">
+                ${brandHeader}
                 <div class="tag-title">Peripheral Tag</div>
-                <div class="qr-box"><div id="printQrCode"></div>${companyLogo}</div>
+                <div class="qr-box"><div id="printQrCode"></div></div>
                 <div class="field-row field-row-small"><span class="field-label">Tag No:</span><span class="field-value" style="font-weight: bold;">${escapeHtml(p.category || 'Peripheral')} - ${escapeHtml(tag)}</span></div>
                 <div class="field-row field-row-small"><span class="field-label">Date Purchase:</span><span class="field-value">${escapeHtml(datePurchase)}</span></div>
                 ${p.brandManufacturer || p.modelSpecs ? `<div class="field-row field-row-small"><span class="field-label">Model/Brand:</span><span class="field-value" style="font-size:12px;">${escapeHtml(p.brandManufacturer || '')} ${escapeHtml(p.modelSpecs || '')}</span></div>` : ''}
@@ -1825,12 +1996,24 @@ function printTag(tag, type) {
     }
 
     const qrContainer = document.getElementById('printQrCode');
+    const config = getTagConfig();
+    area.querySelector('.tag-brand-header').hidden = !config.showCompany;
+    if (!config.showUser && type === 'workstation') area.querySelector('.field-row').hidden = true;
+    if (!config.showDeviceName) {
+        area.querySelectorAll('.field-row').forEach(row => {
+            if (!/Tag No:|Username:/.test(row.textContent)) row.hidden = true;
+        });
+    }
+    const qrBox = area.querySelector('.qr-box');
+    qrBox.style.width = `${config.qrSize}px`;
+    qrBox.style.height = `${config.qrSize}px`;
+    area.querySelector('.print-only-tag').style.paddingRight = `${config.qrSize + 40}px`;
     qrContainer.innerHTML = '';
     if (window.QRCode) {
         new QRCode(qrContainer, {
             text: tag,
-            width: 70,
-            height: 70,
+            width: config.qrSize,
+            height: config.qrSize,
             colorDark: "#000000",
             colorLight: "#ffffff",
             correctLevel: QRCode.CorrectLevel.L

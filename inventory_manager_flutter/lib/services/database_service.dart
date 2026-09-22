@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:inventory_manager_flutter/models/asset.dart';
@@ -111,6 +112,22 @@ class InventoryProvider extends ChangeNotifier {
     final pData = await api.getPeripherals();
     final personnelData = await api.getPersonnel();
     final lData = await api.getLogs();
+    // Branding is shared with the web UI; retain cached values if offline or on an older server.
+    try {
+      final settings = await api.getSettings();
+      for (final key in ['companyName', 'companyAddress', 'companyLogo']) {
+        if (settings[key] is String) await _settingsBox.put(key, settings[key]);
+      }
+      _companyName = _settingsBox.get('companyName', defaultValue: _companyName) as String;
+      _companyAddress = _settingsBox.get('companyAddress', defaultValue: _companyAddress) as String;
+      _companyLogo = _settingsBox.get('companyLogo', defaultValue: _companyLogo) as String;
+      if (settings['tagConfig'] is String) {
+        final config = jsonDecode(settings['tagConfig']);
+        if (config is Map) await saveTagConfig(Map<String, dynamic>.from(config));
+      }
+    } catch (_) {
+      debugPrint('Using cached company branding and tag design');
+    }
 
     // Users (/api/users) is Admin-only. Gracefully handle 403.
     try {
