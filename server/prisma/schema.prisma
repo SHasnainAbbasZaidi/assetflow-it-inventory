@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Personnel {
+  id           String        @id @default(uuid())
+  fullName     String        @map("full_name")
+  department   String?
+  contactEmail String?       @map("contact_email")
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  workstations Workstation[]
+
+  @@map("personnel")
+}
+
+model Workstation {
+  workstationTag String       @id @map("workstation_tag")
+  userName       String?      @map("user_name")
+  personnelId    String?      @map("personnel_id")
+  personnel      Personnel?   @relation(fields: [personnelId], references: [id], onDelete: SetNull)
+  deviceType     String?      @map("device_type")
+  motherboard    String?
+  processorGen   String?      @map("processor_gen")
+  ram            String?
+  ssd            String?
+  hdd            String?
+  gpu            String?
+  status         String       @default("IN_STORE")
+  assignedDate   DateTime?    @map("assigned_date")
+  pdfFile        String?      @map("pdf_file")
+  notes          String?
+  customFields   String?      @map("custom_fields")
+  peripherals    Peripheral[]
+
+  @@map("workstations")
+}
+
+model Peripheral {
+  peripheralTag     String       @id @map("peripheral_tag")
+  category          String?
+  modelSpecs        String?      @map("model_specs")
+  workstationTag    String?      @map("workstation_tag")
+  workstation       Workstation? @relation(fields: [workstationTag], references: [workstationTag], onUpdate: Cascade, onDelete: Restrict)
+  status            String       @default("IN_STORE")
+  purchaseDate      DateTime?    @map("purchase_date")
+  warrantyExpiry    DateTime?    @map("warranty_expiry")
+  brandManufacturer String?      @map("brand_manufacturer")
+  quantity          Int          @default(1)
+  storageCapacity   String?      @map("storage_capacity")
+  gpuSpecs          String?      @map("gpu_specs")
+  customFields      String?      @map("custom_fields")
+
+  @@map("peripherals")
+}
+
+model AppUser {
+  email        String   @id
+  fullName     String   @map("full_name")
+  role         String   @default("VIEWER") // ADMIN, EDITOR, VIEWER
+  status       String   @default("ACTIVE") // ACTIVE, INACTIVE
+  passwordHash String?  @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("users")
+}
+
+model CustomFieldDefinition {
+  id         String   @id @default(uuid())
+  name       String   @unique
+  label      String
+  entityType String   @map("entity_type") // workstation, peripheral, personnel
+  fieldType  String   @map("field_type") // text, number, date, select
+  options    String?  // comma-separated or JSON list
+  required   Boolean  @default(false)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("custom_field_definitions")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@map("app_settings")
+}
+
+model AuditLog {
+  logId       String   @id @map("log_id")
+  timestamp   DateTime
+  userEmail   String?  @map("user_email")
+  assetTag    String?  @map("asset_tag")
+  actionTaken String   @map("action_taken")
+
+  @@map("audit_logs")
+}

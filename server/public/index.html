@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AssetFlow — IT Asset Inventory & Personnel Management</title>
+    <meta name="description" content="Enterprise IT Asset, Peripheral & Personnel Inventory Management System">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Phosphor Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-container" style="display: none;">
+        <div class="login-card glass-panel">
+            <div class="login-logo">
+                <i class="ph ph-hexagon"></i>
+            </div>
+            <div class="login-header">
+                <h2>AssetFlow</h2>
+                <p>Sign in to access IT Asset Inventory</p>
+            </div>
+            <div id="loginError" class="alert-error" style="display: none; width: 100%;">
+                <i class="ph ph-warning-circle"></i>
+                <span id="loginErrorText">Invalid credentials</span>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginEmail">Email / Username</label>
+                    <input type="text" id="loginEmail" required placeholder="admin@assetflow.local" autocomplete="username">
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" required placeholder="••••••••" autocomplete="current-password">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 8px;">
+                    <i class="ph ph-sign-in"></i> Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application UI -->
+    <div id="appContainer" class="app-container" style="display: none;">
+        <!-- Left Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <i class="ph ph-hexagon" id="companyHeaderLogo"></i>
+                <h2 id="companyHeaderTitle">AssetFlow</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <div class="nav-section-title">Inventory</div>
+                <a class="nav-item active" data-tab="dashboard">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </a>
+                <a class="nav-item" data-tab="workstations">
+                    <i class="ph ph-desktop"></i> Workstations
+                </a>
+                <a class="nav-item" data-tab="peripherals">
+                    <i class="ph ph-mouse"></i> Peripherals
+                </a>
+                <a class="nav-item" data-tab="personnel">
+                    <i class="ph ph-users-three"></i> Personnel
+                </a>
+
+                <div class="nav-section-title">Operations</div>
+                <a class="nav-item" data-tab="logs">
+                    <i class="ph ph-list-dashes"></i> Audit Logs
+                </a>
+                <a class="nav-item" data-tab="excel">
+                    <i class="ph ph-file-xls"></i> Excel Tools
+                </a>
+
+                <div class="nav-section-title admin-only" id="adminNavHeader">Administration</div>
+                <a class="nav-item admin-only" data-tab="settings" id="adminSettingsNav">
+                    <i class="ph ph-gear-six"></i> Settings
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <a href="/download/app-release.apk" class="apk-download-card" title="Download Android App APK" target="_blank">
+                    <i class="ph ph-android-logo apk-icon"></i>
+                    <div class="apk-text">
+                        <h4>Android APK</h4>
+                        <p>Download Mobile App</p>
+                    </div>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Body Area -->
+        <main class="main-content">
+            <!-- Top Header -->
+            <header class="top-header">
+                <div class="search-bar">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <input type="text" id="globalSearchInput" placeholder="Global Tag Lookup (e.g. WS-1001, PER-2001)...">
+                </div>
+                <div class="header-actions">
+                    <div class="user-badge">
+                        <div class="user-avatar" id="headerUserAvatar">A</div>
+                        <div class="user-info">
+                            <span class="user-name" id="headerUserName">Admin User</span>
+                            <span class="user-role" id="headerUserRole">ADMIN</span>
+                        </div>
+                    </div>
+                    <button class="icon-btn" id="btnLogout" title="Sign Out">
+                        <i class="ph ph-sign-out"></i>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Dynamic Tab Views Container -->
+            <div class="view-container" id="viewContainer">
+                <!-- Content will be injected here via JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- =================================================================== -->
+    <!-- MODALS -->
+    <!-- =================================================================== -->
+
+    <!-- Global Tag Lookup Modal -->
+    <div class="modal-overlay" id="lookupModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="lookupModalTitle">Asset Details</h3>
+                <button class="icon-btn" onclick="closeModal('lookupModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body" id="lookupModalBody"></div>
+            <div class="modal-footer" id="lookupModalFooter">
+                <button class="btn btn-secondary" onclick="closeModal('lookupModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Personnel Create / Edit Modal -->
+    <div class="modal-overlay" id="personnelModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="personnelModalTitle">New Personnel</h3>
+                <button class="icon-btn" onclick="closeModal('personnelModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="personnelForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="personnelFullName">Full Name *</label>
+                        <input type="text" id="personnelFullName" required placeholder="e.g. John Smith">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="personnelDepartment">Department / Team</label>
+                            <input type="text" id="personnelDepartment" placeholder="e.g. Engineering, Sales, HR">
+                        </div>
+                        <div class="form-group">
+                            <label for="personnelEmail">Contact Email</label>
+                            <input type="email" id="personnelEmail" placeholder="john.smith@company.com">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="personnelNotes">Notes / Role Info</label>
+                        <textarea id="personnelNotes" rows="2" placeholder="Additional details or office location..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('personnelModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Personnel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Personnel Ownership Detail Modal -->
+    <div class="modal-overlay" id="personnelDetailModal">
+        <div class="modal-content glass-panel" style="max-width: 800px;">
+            <div class="modal-header">
+                <h3 id="personnelDetailTitle">Personnel Inventory Ownership</h3>
+                <button class="icon-btn" onclick="closeModal('personnelDetailModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body" id="personnelDetailBody">
+                <!-- Dynamically populated -->
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('personnelDetailModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Workstation Create / Edit Modal -->
+    <div class="modal-overlay" id="workstationModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="workstationModalTitle">New Workstation</h3>
+                <button class="icon-btn" onclick="closeModal('workstationModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="workstationForm">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wsTag">Workstation Tag *</label>
+                            <input type="text" id="wsTag" required placeholder="e.g. WS-1001">
+                        </div>
+                        <div class="form-group">
+                            <label for="wsPersonnelSelect">Assigned Personnel</label>
+                            <select id="wsPersonnelSelect">
+                                <option value="">-- Unassigned (In Store) --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wsDeviceType">Device Type</label>
+                            <input type="text" id="wsDeviceType" placeholder="e.g. Desktop PC / Laptop">
+                        </div>
+                        <div class="form-group">
+                            <label for="wsMotherboard">Motherboard</label>
+                            <input type="text" id="wsMotherboard" placeholder="e.g. ASUS B650M">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wsProcessorGen">Processor & Gen</label>
+                            <input type="text" id="wsProcessorGen" placeholder="e.g. Intel Core i7-13700K">
+                        </div>
+                        <div class="form-group">
+                            <label for="wsRam">RAM</label>
+                            <input type="text" id="wsRam" placeholder="e.g. 32GB DDR5">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wsSsd">SSD Storage</label>
+                            <input type="text" id="wsSsd" placeholder="e.g. 1TB NVMe">
+                        </div>
+                        <div class="form-group">
+                            <label for="wsHdd">HDD Storage</label>
+                            <input type="text" id="wsHdd" placeholder="e.g. 2TB SATA">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="wsGpu">GPU Specs</label>
+                            <input type="text" id="wsGpu" placeholder="e.g. RTX 4070 12GB">
+                        </div>
+                        <div class="form-group">
+                            <label for="wsAssignedDate">Assigned Date</label>
+                            <input type="date" id="wsAssignedDate">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="wsNotes">Notes / Description</label>
+                        <textarea id="wsNotes" rows="2" placeholder="Any additional notes..."></textarea>
+                    </div>
+                    <div id="wsCustomFieldsContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('workstationModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveWorkstation">Save Workstation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Peripheral Create / Edit Modal -->
+    <div class="modal-overlay" id="peripheralModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="peripheralModalTitle">New Peripheral</h3>
+                <button class="icon-btn" onclick="closeModal('peripheralModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="peripheralForm">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="perTag">Peripheral Tag *</label>
+                            <input type="text" id="perTag" required placeholder="e.g. PER-2001">
+                        </div>
+                        <div class="form-group">
+                            <label for="perCategory">Category</label>
+                            <select id="perCategory">
+                                <option value="Display">Display / Monitor</option>
+                                <option value="Keyboard">Keyboard</option>
+                                <option value="Mouse">Mouse</option>
+                                <option value="VR">VR Equipment</option>
+                                <option value="Mobile">Mobile Device</option>
+                                <option value="Headphones">Headphones / Audio</option>
+                                <option value="Printer">Printer / Scanner</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="perBrand">Brand / Manufacturer</label>
+                            <input type="text" id="perBrand" placeholder="e.g. Dell / Logitech">
+                        </div>
+                        <div class="form-group">
+                            <label for="perModelSpecs">Model Specs</label>
+                            <input type="text" id="perModelSpecs" placeholder="e.g. UltraSharp 27 4K">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="perWorkstationTag">Linked Workstation Tag</label>
+                            <select id="perWorkstationSelect">
+                                <option value="">-- Standalone (No Host Machine) --</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="perQuantity">Quantity</label>
+                            <input type="number" id="perQuantity" min="1" value="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="perPurchaseDate">Purchase Date</label>
+                            <input type="date" id="perPurchaseDate">
+                        </div>
+                        <div class="form-group">
+                            <label for="perWarrantyExpiry">Warranty Expiry</label>
+                            <input type="date" id="perWarrantyExpiry">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="perStorageCapacity">Storage Capacity</label>
+                            <input type="text" id="perStorageCapacity" placeholder="e.g. 512GB (if applicable)">
+                        </div>
+                        <div class="form-group">
+                            <label for="perGpuSpecs">GPU Specs</label>
+                            <input type="text" id="perGpuSpecs" placeholder="e.g. Integrated (if applicable)">
+                        </div>
+                    </div>
+                    <div id="perCustomFieldsContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('peripheralModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSavePeripheral">Save Peripheral</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Custom Field Creator Modal -->
+    <div class="modal-overlay" id="customFieldModal">
+        <div class="modal-content glass-panel" style="max-width: 540px;">
+            <div class="modal-header">
+                <h3>Add Custom Field</h3>
+                <button class="icon-btn" onclick="closeModal('customFieldModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="customFieldForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="cfLabel">Field Label *</label>
+                        <input type="text" id="cfLabel" required placeholder="e.g. Asset Location / Warranty Provider">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="cfEntityType">Attach To Entity *</label>
+                            <select id="cfEntityType">
+                                <option value="workstation">Workstation</option>
+                                <option value="peripheral">Peripheral</option>
+                                <option value="personnel">Personnel</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="cfFieldType">Field Input Type *</label>
+                            <select id="cfFieldType">
+                                <option value="text">Text Input</option>
+                                <option value="number">Number</option>
+                                <option value="date">Date Picker</option>
+                                <option value="select">Dropdown Selection</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group" id="cfOptionsGroup" style="display: none;">
+                        <label for="cfOptions">Dropdown Options (Comma separated)</label>
+                        <input type="text" id="cfOptions" placeholder="Option 1, Option 2, Option 3">
+                    </div>
+                    <div class="form-group" style="flex-direction: row; align-items: center; gap: 10px;">
+                        <input type="checkbox" id="cfRequired" style="width: auto;">
+                        <label for="cfRequired" style="margin-bottom: 0; cursor: pointer;">Required Field</label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('customFieldModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Field</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- App User Modal (Users & Access) -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="userModalTitle">New Login Account</h3>
+                <button class="icon-btn" onclick="closeModal('userModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <form id="userForm">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="userEmail">Email Address (Login Username) *</label>
+                        <input type="email" id="userEmail" required placeholder="operator@company.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="userFullName">Full Name *</label>
+                        <input type="text" id="userFullName" required placeholder="Jane Doe">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="userRole">Access Role *</label>
+                            <select id="userRole">
+                                <option value="VIEWER">Viewer (Read-only access)</option>
+                                <option value="EDITOR">Editor (Manage inventory & personnel)</option>
+                                <option value="ADMIN">Administrator (Full access + Settings)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="userStatus">Account Status *</label>
+                            <select id="userStatus">
+                                <option value="ACTIVE">Active</option>
+                                <option value="INACTIVE">Inactive</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label for="userPassword">Password (leave blank to keep current when editing)</label>
+                        <input type="password" id="userPassword" placeholder="••••••••">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('userModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Printable Asset Tag Modal -->
+    <div class="modal-overlay" id="tagPrintModal">
+        <div class="modal-content glass-panel" style="max-width: 480px;">
+            <div class="modal-header">
+                <h3>Asset Tag</h3>
+                <button class="icon-btn" onclick="closeModal('tagPrintModal')"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body" style="align-items: center; justify-content: center; background: #e5e7eb; padding: 32px;">
+                <!-- The printable tag will be injected here by JS -->
+                <div id="printableTagArea"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModal('tagPrintModal')">Close</button>
+                <button class="btn btn-primary" onclick="window.print()"><i class="ph ph-printer"></i> Print Tag</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,197 @@
+==================================================
+ASSET TAG SYSTEM SPECIFICATIONS & DESIGN CODE
+==================================================
+
+1. PERIPHERAL TAG (Smaller Tag)
+--------------------------------------------------
+Usage: Designed for peripheral devices such as keyboards, mice, headphones, monitor displays, etc.
+Fields Included:
+- Tag No: Format example -> keyboard - 4201 - (Date)
+- Date Purchase: (Purchase Date)
+Layout: Title at the top left, fields stacked vertically below. QR Code positioned on the top right.
+
+2. PERSONNEL DEVICE DETAILS TAG (Bigger Tag)
+--------------------------------------------------
+Usage: Main hardware tag generated from application personnel data. 
+Fields Included:
+- Username:
+- CPU:
+- Motherboard:
+- Storage:
+- RAM:
+- GPU:
+Layout: Title at the top left, hardware specifications stacked vertically. QR Code positioned on the top right.
+
+3. QR CODE SPECIFICATIONS & FUNCTIONALITY
+--------------------------------------------------
+Design: Standard QR code with the company/application logo placed directly in the center.
+Functionality: By scanning the QR code, users/administrators can:
+1. Add the device to the system.
+2. Remove the device from the system.
+3. See detailed information and specifications of the device.
+
+==================================================
+HTML / CSS DESIGN CODE (For Code Generators)
+==================================================
+<!DOCTYPE html>
+<html>
+<head>
+<style>
+    @page { 
+        size: A4; 
+        margin: 20mm; 
+        background-color: #faf8f5; 
+    }
+    *, *::before, *::after {
+        box-sizing: border-box;
+    }
+    body { 
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; 
+        color: #333;
+        margin: 0;
+        padding: 0;
+    }
+    h1 {
+        font-size: 22px;
+        color: #2c3e50;
+        margin-bottom: 30px;
+        border-bottom: 2px solid #2c3e50;
+        padding-bottom: 10px;
+    }
+    .tag-container {
+        margin-bottom: 40px;
+    }
+    .tag {
+        background: #ffffff;
+        border: 2px solid #bdc3c7;
+        border-radius: 8px;
+        padding: 20px;
+        position: relative;
+        box-shadow: 2px 4px 10px rgba(0,0,0,0.05);
+    }
+    .tag-small {
+        width: 380px;
+        min-height: 120px;
+    }
+    .tag-large {
+        width: 450px;
+        min-height: 220px;
+    }
+    .tag-title {
+        font-weight: bold;
+        font-size: 16px;
+        margin-bottom: 15px;
+        color: #2980b9;
+        width: 70%;
+        border-bottom: 1px solid #ecf0f1;
+        padding-bottom: 5px;
+    }
+    .qr-box {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        width: 70px;
+        height: 70px;
+        border: 2px dashed #7f8c8d;
+        background-color: #f9f9f9;
+        text-align: center;
+        font-size: 10px;
+        color: #7f8c8d;
+        padding-top: 15px;
+    }
+    .qr-box .logo {
+        display: block;
+        font-weight: bold;
+        color: #e74c3c;
+        margin-top: 5px;
+        font-size: 12px;
+    }
+    .field-row {
+        margin-bottom: 10px;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    .field-label {
+        font-weight: bold;
+        color: #34495e;
+        display: inline-block;
+        width: 120px;
+    }
+    .field-value {
+        color: #555;
+        border-bottom: 1px dotted #ccc;
+        display: inline-block;
+        width: calc(100% - 130px);
+        min-height: 18px;
+    }
+    .field-row-small .field-label {
+        width: 110px;
+    }
+    .field-row-small .field-value {
+        width: calc(100% - 120px);
+    }
+    .instruction {
+        font-size: 12px;
+        color: #7f8c8d;
+        margin-top: 20px;
+        font-style: italic;
+    }
+</style>
+</head>
+<body>
+
+    <h1>Asset Tag Designs</h1>
+
+    <div class="tag-container">
+        <div class="tag tag-small">
+            <div class="tag-title">Peripheral Tag</div>
+            <div class="qr-box">QR Code<span class="logo">[LOGO]</span></div>
+            
+            <div class="field-row field-row-small">
+                <span class="field-label">Tag No:</span>
+                <span class="field-value">keyboard - 4201 - (Date)</span>
+            </div>
+            <div class="field-row field-row-small">
+                <span class="field-label">Date Purchase:</span>
+                <span class="field-value">(Purchase Date)</span>
+            </div>
+        </div>
+        <div class="instruction">* Intended for peripherals: Keyboard, Mouse, Headphones, Monitor Displays, etc.</div>
+    </div>
+
+    <div class="tag-container">
+        <div class="tag tag-large">
+            <div class="tag-title">Device Details</div>
+            <div class="qr-box">QR Code<span class="logo">[LOGO]</span></div>
+            
+            <div class="field-row">
+                <span class="field-label">Username:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">CPU:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Motherboard:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">Storage:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">RAM:</span>
+                <span class="field-value"></span>
+            </div>
+            <div class="field-row">
+                <span class="field-label">GPU:</span>
+                <span class="field-value"></span>
+            </div>
+        </div>
+        <div class="instruction">* Generated from application personnel data. Scannable QR code allows adding, removing, and viewing device details.</div>
+    </div>
+
+</body>
+</html>
+

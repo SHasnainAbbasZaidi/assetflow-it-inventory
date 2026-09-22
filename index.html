@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IT Asset Manager Premium</title>
+    <meta name="description" content="A premium IT Asset & Inventory Management software.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <!-- QR Code Generator -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- HTML5 QR Code Scanner -->
+    <script src="https://unpkg.com/html5-qrcode"></script>
+    <!-- jsPDF for PDF Generation -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+    <div id="app" class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <i class="ph ph-hexagon"></i>
+                <h2>AssetFlow</h2>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#dashboard" class="nav-item active" data-view="dashboard">
+                    <i class="ph ph-squares-four"></i> Dashboard
+                </a>
+                <a href="#assets" class="nav-item" data-view="assets">
+                    <i class="ph ph-laptop"></i> Assets
+                </a>
+                <a href="#users" class="nav-item" data-view="users">
+                    <i class="ph ph-users"></i> Personnel
+                </a>
+                <a href="#tags" class="nav-item" data-view="tags">
+                    <i class="ph ph-tag"></i> Tag Generator
+                </a>
+                <a href="#scanner" class="nav-item" data-view="scanner">
+                    <i class="ph ph-scan"></i> QR Scanner
+                </a>
+                <a href="#logs" class="nav-item" data-view="logs">
+                    <i class="ph ph-list-dashes"></i> Activity Logs
+                </a>
+                <a href="#settings" class="nav-item" data-view="settings">
+                    <i class="ph ph-gear"></i> Settings
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="search-bar">
+                    <i class="ph ph-magnifying-glass"></i>
+                    <input type="text" placeholder="Search assets, serial numbers, personnel..." id="globalSearch">
+                </div>
+                <div class="user-profile">
+                    <div class="avatar">
+                        <img src="https://ui-avatars.com/api/?name=Admin&background=random" alt="User Avatar">
+                    </div>
+                </div>
+            </header>
+
+            <div class="view-container" id="viewContainer">
+                <!-- Views will be injected here via JS -->
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for adding/editing assets -->
+    <div class="modal-overlay" id="assetModal">
+        <div class="modal-content glass-panel">
+            <div class="modal-header">
+                <h3 id="modalTitle">Add New Asset</h3>
+                <button class="icon-btn" id="btnCloseModal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body scrollable-body">
+                <form id="assetForm">
+                    <input type="hidden" id="assetId">
+                    <div class="form-group">
+                        <label for="assetName">Asset Name</label>
+                        <input type="text" id="assetName" required placeholder="e.g. MacBook Pro M3">
+                    </div>
+                    <div class="form-group">
+                        <label for="assetCategory">Category</label>
+                        <select id="assetCategory" required>
+                            <option value="">Select Category...</option>
+                            <option value="PC/Laptop">PC/Laptop</option>
+                            <option value="Display">Display</option>
+                            <option value="VR">VR Equipment</option>
+                            <option value="Mobile">Mobile Device</option>
+                            <option value="Keyboard">Keyboard</option>
+                            <option value="Mouse">Mouse</option>
+                            <option value="Headphones">Headphones</option>
+                            <option value="Software">Software</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assetSerial">Serial Number / Tag</label>
+                        <input type="text" id="assetSerial" required placeholder="e.g. SN-123456">
+                    </div>
+                    <div class="form-group">
+                        <label for="assetStatus">Status</label>
+                        <select id="assetStatus" required>
+                            <option value="Available">Available</option>
+                            <option value="In Use">In Use</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="Retired">Retired (Deprecated)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="assetAssignee">Assigned To (Personnel)</label>
+                        <select id="assetAssignee">
+                            <!-- Populated dynamically via JS -->
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Custom Fields Container -->
+                    <div id="dynamicFieldsContainer" class="dynamic-fields">
+                        <!-- Custom fields injected here via JS -->
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="btnCancelModal">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Asset</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal for adding/editing users -->
+    <div class="modal-overlay" id="userModal">
+        <div class="modal-content glass-panel" style="max-width: 400px;">
+            <div class="modal-header">
+                <h3 id="userModalTitle">Add Personnel</h3>
+                <button class="icon-btn" id="btnCloseUserModal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body">
+                <form id="userForm">
+                    <input type="hidden" id="userId">
+                    <div class="form-group">
+                        <label for="userName">Full Name</label>
+                        <input type="text" id="userName" required placeholder="e.g. John Doe">
+                    </div>
+                    <div class="form-group">
+                        <label for="userDepartment">Department</label>
+                        <input type="text" id="userDepartment" required placeholder="e.g. Engineering">
+                    </div>
+                    <div class="form-group">
+                        <label for="userEmail">Email</label>
+                        <input type="email" id="userEmail" required placeholder="john@example.com">
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="btn-secondary" id="btnCancelUserModal">Cancel</button>
+                        <button type="submit" class="btn-primary">Save Person</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+
+
+    <!-- Modal for User Inventory Detail -->
+    <div class="modal-overlay" id="userInventoryModal">
+        <div class="modal-content glass-panel" style="max-width: 700px;">
+            <div class="modal-header">
+                <h3 id="inventoryModalTitle">Assigned Inventory</h3>
+                <button class="icon-btn" id="btnCloseInventoryModal"><i class="ph ph-x"></i></button>
+            </div>
+            <div class="modal-body scrollable-body" id="userInventoryList">
+                <!-- User Inventory List injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <script src="./app.js"></script>
+</body>
+</html>
