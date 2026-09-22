@@ -31,6 +31,12 @@
     --radius-sm: 6px;
 }
 
+:root[data-theme="midnight"] { --bg-dark: #071426; --bg-surface: #0c2038; --bg-panel: #17334c; --bg-card: #112941; }
+:root[data-theme="onyx"] { --bg-dark: #09090b; --bg-surface: #18181b; --bg-panel: #27272a; --bg-card: #202023; }
+[hidden] { display: none !important; }
+.settings-subnav { flex-wrap: wrap; }
+.tag-brand-header { max-width: 100%; }
+
 * {
     margin: 0;
     padding: 0;
@@ -86,10 +92,26 @@ body {
     border-bottom: 1px solid var(--border-subtle);
 }
 
-.sidebar-header i {
+.sidebar-header > i,
+.sidebar-brand-logo > i {
     font-size: 28px;
     color: var(--accent);
     filter: drop-shadow(0 0 10px var(--accent-glow));
+}
+
+.sidebar-brand-logo {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: grid;
+    place-items: center;
+}
+
+.sidebar-brand-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 7px;
 }
 
 .sidebar-header h2 {
@@ -721,6 +743,13 @@ tr:hover td {
     filter: drop-shadow(0 0 16px var(--accent-glow));
 }
 
+.login-logo img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    border-radius: 10px;
+}
+
 .login-header {
     text-align: center;
 }
@@ -842,6 +871,113 @@ tr:hover td {
     backdrop-filter: blur(16px);
 }
 
+.branding-settings-pane {
+    max-width: 900px;
+}
+
+.branding-settings-pane > div:first-child h3 {
+    font-size: 20px;
+    margin-bottom: 8px;
+}
+
+.branding-settings-pane > div:first-child p {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.branding-settings-pane form {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.branding-upload-zone {
+    width: 100%;
+    min-height: 150px;
+    border: 1px solid rgba(99, 102, 241, 0.55);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.018);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.branding-upload-zone:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.branding-upload-zone i {
+    color: #818cf8;
+    font-size: 36px;
+}
+
+.branding-upload-zone img {
+    width: 74px;
+    height: 74px;
+    object-fit: contain;
+    border-radius: 10px;
+}
+
+.branding-upload-zone span {
+    font-size: 14px;
+}
+
+.branding-upload-zone small {
+    color: var(--text-muted);
+    font-size: 11px;
+}
+
+.branding-fields {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.branding-fields textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+.branding-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.btn-danger-outline {
+    background: transparent;
+    border-color: rgba(239, 68, 68, 0.75);
+    color: #f87171;
+}
+
+.btn-danger-outline:hover:not(:disabled) {
+    background: rgba(239, 68, 68, 0.12);
+}
+
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 /* Ownership Cards */
 .ownership-card {
     background: rgba(255, 255, 255, 0.02);
@@ -901,6 +1037,46 @@ tr:hover td {
     width: 70%;
     border-bottom: 1px solid #ecf0f1;
     padding-bottom: 5px;
+}
+.tag-brand-header {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    width: calc(100% - 90px);
+    margin-bottom: 12px;
+    padding-bottom: 9px;
+    border-bottom: 1px solid #dfe5e8;
+}
+.tag-brand-mark {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    display: grid;
+    place-items: center;
+}
+.tag-brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+}
+.tag-brand-fallback {
+    color: #6366f1;
+    font-size: 28px;
+}
+.tag-brand-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.25;
+}
+.tag-brand-copy strong {
+    color: #111827;
+    font-size: 13px;
+}
+.tag-brand-copy span {
+    color: #6b7280;
+    font-size: 9px;
+    overflow-wrap: anywhere;
 }
 .qr-box {
     position: absolute;
