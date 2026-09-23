@@ -11,7 +11,7 @@ export async function assignAsset(prisma, kind, tag, request, email) {
     const person=await tx.personnel.findUnique({where:{id:request.personnelId}});
     if(!person)throw httpError(404,'Person no longer exists. Select another person.');
     const owner=item.personnelId || item.workstation?.personnelId || null;
-    if(['RETIRED','OUT_OF_ORDER'].includes(item.status))throw httpError(409,'Restore this item to service before assigning it.');
+    if(['RETIRED','OUT_OF_ORDER','SCRAPPED'].includes(item.status))throw httpError(409,'Restore this item to service before assigning it.');
     if(owner===person.id && item.status==='ASSIGNED')return {item,person,unchanged:true};
     if(assignmentState(item)!==request.expectedState)throw httpError(409,'Assignment changed since scanning. Scan again before assigning.','STALE_ASSIGNMENT');
     if((owner || item.status==='ASSIGNED' || (kind==='peripheral' && item.workstationTag)) && request.allowReassign!==true)throw httpError(409,'Confirm reassignment before replacing the current owner.','CONFIRM_REASSIGN');

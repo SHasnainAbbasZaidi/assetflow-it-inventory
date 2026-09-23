@@ -1,9 +1,43 @@
-# AssetFlow deployment
+# AssetFlow 1.1.0
 
-`server/` is the production API. It runs **Node.js only**: Express, Prisma/PostgreSQL, ExcelJS, and no Flutter SDK or Dart runtime.
+IT inventory management for web and Android. A product of **Mahzaidex Tech**, developed by **Hasnain Zaidi**.
 
-1. Copy `server/.env.example` to `server/.env` and set PostgreSQL and a strong JWT secret.
-2. In `server/`, run `npm install`, `npm run db:generate`, `npm run db:migrate`, then `npm start`.
-3. Build Android/iOS or web Flutter artifacts locally or in CI. Mobile APK/IPA files go directly to devices. If a web UI is desired, run `flutter build web` outside the server and set `FLUTTER_WEB_DIR` to its prebuilt `build/web` directory. Express only serves static HTML/JS/CSS; it never builds Flutter.
+- Workstations, peripherals, personnel, assignment history, QR scanning and customizable printable tags.
+- Administrator reports, including batch Scrap Items Reports with operator/date details and printable PDF/Excel output.
+- Daily Excel and full-state backups, manual backup/restore, and Settings-only permanent deletion.
+- Personal OpenAI and Google Gemini API keys encrypted on the server; AI inventory analysis and image-assisted item entry.
 
-The Excel routes require a Bearer token. Import accepts `multipart/form-data` with field `file`; export is `GET /api/excel/export`. Both use the exact four-sheet `IT Asset Database.xlsx` schema.
+## Installation and updates
+
+Follow [INSTALLATION.md](INSTALLATION.md). The production web/API server uses Node.js, Express, Prisma and **SQLite**. Flutter is needed only to build Android applications; it is not needed on the hosting server.
+
+**Existing installations:** preserve your `.env`, SQLite database, AI encryption key and backup directories. Run `npm ci`, `npm run db:generate`, then restart from `server/`. Startup performs the supported additive schema upgrade with a pre-upgrade backup. It never resets or seeds existing records. A missing/incompatible database stops startup with an error instead of silently creating a new inventory.
+
+**New installations only:** configure an unused persistent database path and initial administrator password, then run `npm run db:init`. This command refuses to overwrite an existing file. Never run Prisma reset/development migration commands against production data.
+
+## Documentation
+
+- [Self-hosting, safe updates and troubleshooting](INSTALLATION.md)
+- [Backups and restore](server/BACKUPS.md)
+- [Android launcher branding and release builds](inventory_manager_flutter/README.md)
+- [Security and AI credentials](SECURITY.md)
+- [Release notes](CHANGELOG.md)
+
+Reports and destructive administration features require an active administrator. All signed-in users can manage their own AI keys in Settings. Excel import is administrator-only because workbooks can contain user accounts. The Excel data exchange uses the Workstations, Peripherals, Users and Audit Logs sheets; full-state restore uses JSON backups, not the exchange workbook.
+
+## Verification
+
+From `server/`, with Node.js 24 for the isolated SQLite tests:
+
+```sh
+node --test tests/*.test.js tests/*.test.cjs
+```
+
+Browser tests require Playwright in the local `.build-tools` directory. From the Flutter project:
+
+```sh
+flutter analyze --no-fatal-infos
+flutter test
+```
+
+The release APK and checksums are published in [GitHub Releases](https://github.com/SHasnainAbbasZaidi/assetflow-it-inventory/releases). Keep the same Android application ID and signing key when updating an installed app.

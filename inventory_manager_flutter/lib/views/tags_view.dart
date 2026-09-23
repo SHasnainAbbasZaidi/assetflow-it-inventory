@@ -1,3 +1,4 @@
+import '../providers/auth_provider.dart';
 import 'dart:convert';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -24,7 +25,7 @@ class _TagsViewState extends State<TagsView> {
   Future<void> _exportCSV(BuildContext context) async {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
     final csv = provider.getCSVContent();
-    
+
     try {
       await saveAndLaunchFile(utf8.encode(csv), 'inventory_export.csv', mimeType: 'text/csv');
       if (context.mounted) {
@@ -231,48 +232,45 @@ class _TagsViewState extends State<TagsView> {
             children: [
               const Text('Generate New Tags'),
               IconButton(
-                icon: isScanning 
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) 
+                icon: isScanning
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.camera_alt, color: Color(0xFF6366F1)),
                 tooltip: 'Scan Item with Camera',
                 onPressed: isScanning ? null : () async {
-                  final provider = Provider.of<InventoryProvider>(context, listen: false);
-                  if (provider.geminiApiKey.isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please set Gemini API Key in Settings first.')));
-                    return;
-                  }
-                  
+                  final auth = context.read<AuthProvider>();
+                  final consent = await showDialog<bool>(context: context, builder: (dialog) => AlertDialog(title: const Text('Analyze image with Gemini'),content: const Text('The photo you take will be sent to Google Gemini using your encrypted personal API key. Review extracted details before saving.'),actions:[TextButton(onPressed:()=>Navigator.pop(dialog,false),child:const Text('Cancel')),TextButton(onPressed:()=>Navigator.pop(dialog,true),child:const Text('Continue'))]));
+                  if(consent != true || auth.apiToken == null) return;
                   try {
                     final picker = ImagePicker();
                     final image = await picker.pickImage(source: ImageSource.camera);
                     if (image == null) return;
-                    
+
                     setStateDialog(() => isScanning = true);
                     final bytes = await image.readAsBytes();
-                    
-                    final result = await AIScannerService.analyzeItemImage(bytes, provider.geminiApiKey);
-                    
+
+                    final result = await AIScannerService.analyzeItemImage(bytes, auth.apiToken!, mimeType: image.path.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg');
+
                     setStateDialog(() {
                       if (result['itemCategory']?.isNotEmpty == true) itemCategoryController.text = result['itemCategory'];
                       if (result['deviceType']?.isNotEmpty == true) deviceTypeController.text = result['deviceType'];
                       if (result['modelName']?.isNotEmpty == true) modelNameController.text = result['modelName'];
                       if (result['vendorName']?.isNotEmpty == true) vendorController.text = result['vendorName'];
-                      
+
                       final serial = result['serialNumber']?.toString() ?? '';
                       if (serial.isNotEmpty) {
                         final currentNotes = notesController.text;
                         notesController.text = currentNotes.isEmpty ? 'S/N: $serial' : '$currentNotes\nS/N: $serial';
                       }
-                      
+
                       final notes = result['notes']?.toString() ?? '';
                       if (notes.isNotEmpty) {
                         final currentNotes = notesController.text;
                         notesController.text = currentNotes.isEmpty ? notes : '$currentNotes\n$notes';
                       }
-                      
+
                       isScanning = false;
                     });
-                    
+
                     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Item scanned successfully!')));
                   } catch (e) {
                     setStateDialog(() => isScanning = false);

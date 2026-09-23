@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -12,14 +11,21 @@ import { z } from 'zod';
 import { prisma } from './prisma.js';
 import { AssetStatus, exportWorkbook, importWorkbook } from './services/excel-service.js';
 import { errorHandler, httpError, notFound } from './middleware/errors.js';
-import { seedAndMigrateData } from '../prisma/seed.js';
+import {databasePath} from './runtime-config.js';
+import {upgradeDatabase} from './services/database-upgrade.js';
 import { assignAsset, assignmentState } from './services/assignment-service.js';
+import { createBackupService } from './services/backup-service.js';
+import { adminTools } from './services/admin-tools.js';
+import {createVault,aiRoutes,privateSetting} from './services/ai-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const publicDir = path.join(__dirname, '../public');
 
 const app = express();
+app.set('trust proxy', 'loopback');
+const vault = createVault(prisma);
+const backups = createBackupService(prisma, process.env.BACKUP_ROOT, vault.validate);
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 const statuses = Object.values(AssetStatus);
 
@@ -72,6 +78,7 @@ const transitions = {
   ASSIGNED: ['IN_STORE', 'RETIRED', 'OUT_OF_ORDER'],
   OUT_OF_ORDER: ['IN_STORE', 'RETIRED'],
   RETIRED: ['IN_STORE'],
+  SCRAPPED: [],
 };
 
 app.use(cors({ origin: process.env.CORS_ORIGIN?.split(',') || true }));
@@ -96,11 +103,14 @@ app.get('/download/app-release.apk', (req, res) => {
 });
 
 // Authentication & RBAC Middleware
-function requireAuth(req, res, next) {
+async function requireAuth(req, res, next) {
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') || req.query.token;
   if (!token) return next(httpError(401, 'Authentication is required.', 'UNAUTHORIZED'));
   try {
-    req.auth = jwt.verify(token, process.env.JWT_SECRET || 'assetflow-super-secret-production-key-2026');
+    req.auth = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await prisma.appUser.findUnique({where:{email:req.auth.email}});
+    if (!user || user.status !== 'ACTIVE') return next(httpError(401, 'Account is unavailable.', 'UNAUTHORIZED'));
+    req.auth = {...req.auth, role:user.role, fullName:user.fullName};
     next();
   } catch {
     next(httpError(401, 'Invalid or expired token.', 'UNAUTHORIZED'));
@@ -160,6 +170,8 @@ async function changeStatus(kind, tag, nextStatus, userEmail) {
 
 // Health Check
 app.get('/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
+app.use('/api/admin', requireAuth, adminTools(prisma, backups));
+app.use('/api/ai', requireAuth, aiRoutes(prisma, vault));
 
 // Authentication Login
 app.post('/api/auth/login', async (req, res) => {
@@ -171,7 +183,7 @@ app.post('/api/auth/login', async (req, res) => {
   if (user.status !== 'ACTIVE') {
     throw httpError(403, 'Your account is inactive. Please contact an administrator.', 'ACCOUNT_INACTIVE');
   }
-  const secret = process.env.JWT_SECRET || 'assetflow-super-secret-production-key-2026';
+  const secret = process.env.JWT_SECRET;
   const token = jwt.sign({ email: user.email, role: user.role, fullName: user.fullName }, secret, { expiresIn: '12h' });
   res.json({
     token,
@@ -342,7 +354,7 @@ app.get('/api/sync', requireAuth, async (req, res) => {
     peripherals,
     personnel,
     users,
-    settings,
+    settings: settings.filter(s => !privateSetting(s.key)),
     logs,
   });
 });
@@ -522,7 +534,7 @@ app.get('/api/branding', async (req, res) => {
 app.get('/api/settings', requireAuth, async (req, res) => {
   const settings = await prisma.appSetting.findMany();
   const map = {};
-  settings.forEach(s => { map[s.key] = s.value; });
+  settings.filter(s => !privateSetting(s.key)).forEach(s => { map[s.key] = s.value; });
   res.json(map);
 });
 
@@ -531,6 +543,7 @@ app.post('/api/settings', requireAuth, requireRole(['ADMIN']), async (req, res) 
   if (typeof payload !== 'object' || payload === null) {
     throw httpError(400, 'Invalid settings payload.', 'VALIDATION_ERROR');
   }
+  if (Object.keys(payload).some(privateSetting)) throw httpError(400, 'Use AI API Keys to manage credentials.');
   if (Object.hasOwn(payload, 'companyName')) {
     const companyName = String(payload.companyName).trim();
     if (!companyName || companyName.length > 120) {
@@ -685,7 +698,7 @@ app.get('/api/logs', requireAuth, async (req, res) => {
 // =====================================================================
 // EXCEL IMPORT & EXPORT
 // =====================================================================
-app.post('/api/excel/import', requireAuth, requireRole(['ADMIN', 'EDITOR']), upload.single('file'), async (req, res) => {
+app.post('/api/excel/import', requireAuth, requireRole(['ADMIN']), upload.single('file'), async (req, res) => {
   if (!req.file || !req.file.originalname.toLowerCase().endsWith('.xlsx')) {
     throw httpError(400, 'Please upload one .xlsx file in the "file" form field.', 'INVALID_UPLOAD');
   }
@@ -725,7 +738,9 @@ app.use(errorHandler);
 const port = Number(process.env.PORT || 5555);
 
 async function startServer() {
-  await seedAndMigrateData();
+  if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) throw new Error('Set a persistent JWT_SECRET of at least 32 characters.');
+  await upgradeDatabase(prisma,databasePath);
+  backups.start(24);
 
   app.listen(port, '0.0.0.0', () => {
     console.log(`AssetFlow Node API & Web Server listening on port ${port}`);
@@ -734,5 +749,7 @@ async function startServer() {
 
 export { app };
 if (process.env.NODE_ENV !== 'test') startServer().catch(err => {
-  console.error('Failed to start AssetFlow:', err);
+  console.error('Failed to start AssetFlow:', err.message);
+  process.exitCode=1;
+  void prisma.$disconnect();
 });

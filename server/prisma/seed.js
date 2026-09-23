@@ -5,10 +5,11 @@ import { prisma } from '../src/prisma.js';
 export async function seedAndMigrateData() {
   try {
     // 1. Seed Default Admin
-    const adminEmail = 'admin@assetflow.local';
+    const adminEmail = process.env.INITIAL_ADMIN_EMAIL || 'admin@assetflow.local';
     const existing = await prisma.appUser.findUnique({ where: { email: adminEmail } });
-    if (!existing) {
-      const passwordHash = await bcrypt.hash('admin123', 10);
+    if (!existing && await prisma.appUser.count() === 0) {
+      if (!process.env.INITIAL_ADMIN_PASSWORD || process.env.INITIAL_ADMIN_PASSWORD.length < 12) throw new Error('Set INITIAL_ADMIN_PASSWORD to at least 12 characters for a new installation.');
+      const passwordHash = await bcrypt.hash(process.env.INITIAL_ADMIN_PASSWORD, 12);
       await prisma.appUser.create({
         data: {
           email: adminEmail,
@@ -18,13 +19,13 @@ export async function seedAndMigrateData() {
           passwordHash,
         }
       });
-      console.log('✅ Default admin user verified: admin@assetflow.local / admin123');
+      console.info('Initial administrator account created.');
     }
 
     // 2. Backfill existing Workstation userNames into Personnel entity
     const workstationsWithUsers = await prisma.workstation.findMany({
       where: {
-        userName: { not: null }
+        userName: { not: null }, personnelId: null
       }
     });
 
@@ -45,7 +46,7 @@ export async function seedAndMigrateData() {
             notes: 'Migrated from workstation assignment'
           }
         });
-        console.log(`👤 Created Personnel record for: ${name}`);
+
       }
 
       if (!ws.personnelId || ws.personnelId !== person.id) {
@@ -78,7 +79,7 @@ export async function seedAndMigrateData() {
     }
 
   } catch (err) {
-    console.warn('⚠️ Error during database initialization / seed:', err.message);
+    throw err;
   }
 }
 

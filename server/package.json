@@ -6,7 +6,8 @@
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "node scripts/migrate-direct-assignment.js",
+    "db:init": "node scripts/initialize-database.js"
   },
   "dependencies": {
     "@prisma/client": "^6.6.0",
@@ -19,5 +20,10 @@
     "multer": "^1.4.5-lts.1",
     "zod": "^3.24.3"
   },
-  "devDependencies": { "prisma": "^6.6.0" }
+  "devDependencies": {
+    "prisma": "^6.6.0"
+  },
+  "version": "1.1.0",
+  "description": "AssetFlow by Mahzaidex Tech",
+  "author": "Hasnain Zaidi"
 }

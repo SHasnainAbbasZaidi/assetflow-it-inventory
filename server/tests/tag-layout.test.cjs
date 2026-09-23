@@ -12,7 +12,7 @@ test('A6 and A7 print with four/eight tags, safe margins and intact proportions'
 });
 test('mixed sizes get separate pages',()=>{const pages=paginate([{template:defaults('workstation')},{template:defaults('peripheral')}]);assert.equal(pages.length,2);});
 test('case-insensitive partial search matches all supported fields and handles empty input',()=>{
- const rows=[{tag:'WS-1001',fields:{tag:'WS-1001',name:'Design PC',type:'Workstation',company:'MAH Systems'}}];
+ const rows=[{tag:'WS-1001',fields:{tag:'WS-1001',name:'Design PC',type:'Workstation',company:'Mahzaidex Tech'}}];
  for(const q of [' 100 ','design','WORKSTATION','mah'])assert.equal(search(rows,q).length,1);
  assert.equal(search(rows,' ').length,0);assert.equal(search(rows,'none').length,0);
 });

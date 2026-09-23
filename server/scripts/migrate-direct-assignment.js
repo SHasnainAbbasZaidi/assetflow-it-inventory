@@ -1,19 +1,6 @@
-import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
-import path from 'node:path';
-const prisma = new PrismaClient();
-try {
-  const columns = await prisma.$queryRawUnsafe('PRAGMA table_info(peripherals)');
-  if (!columns.length) throw Error('Existing peripherals table is required. Initialize a fresh database with Prisma first.');
-  if (columns.some(column => column.name === 'personnel_id')) {
-    console.log('Direct assignment migration already applied.');
-  } else {
-    const backup = path.resolve(`assignment-backup-${Date.now()}.db`);
-    await prisma.$executeRawUnsafe('VACUUM INTO ?', backup);
-    await prisma.$transaction(async tx => {
-      await tx.$executeRawUnsafe('ALTER TABLE peripherals ADD COLUMN personnel_id TEXT REFERENCES personnel(id) ON DELETE SET NULL');
-      await tx.$executeRawUnsafe('CREATE INDEX IF NOT EXISTS peripherals_personnel_id_idx ON peripherals(personnel_id)');
-    });
-    console.log(`Added optional peripheral owner. Backup: ${backup}`);
-  }
-} finally { await prisma.$disconnect(); }
+import {databasePath} from '../src/runtime-config.js';
+import {prisma} from '../src/prisma.js';
+import {upgradeDatabase} from '../src/services/database-upgrade.js';
+try {await upgradeDatabase(prisma,databasePath);console.info('Database verified; existing records preserved.');}
+catch(error) {console.error(error.message);process.exitCode=1;}
+finally {await prisma.$disconnect();}

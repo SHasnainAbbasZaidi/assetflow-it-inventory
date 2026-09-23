@@ -7,7 +7,6 @@ import 'package:inventory_manager_flutter/models/asset_tag.dart';
 import 'package:inventory_manager_flutter/models/user.dart';
 import 'package:inventory_manager_flutter/models/personnel.dart';
 import 'package:inventory_manager_flutter/models/activity_log.dart';
-import 'package:csv/csv.dart';
 import 'package:inventory_manager_flutter/services/asset_api_service.dart';
 
 class InventoryProvider extends ChangeNotifier {
@@ -15,7 +14,7 @@ class InventoryProvider extends ChangeNotifier {
 
   List<Asset> _workstations = [];
   List<Asset> _peripherals = [];
-  
+
   // Tag customization config
   Map<String, dynamic> _tagConfig = {
     'showDeviceName': true,
@@ -34,7 +33,6 @@ class InventoryProvider extends ChangeNotifier {
   String _companyLogo = '';
   String _companyName = '';
   String _companyAddress = '';
-  String _geminiApiKey = '';
   bool _initialized = false;
   String? _token;
 
@@ -48,7 +46,6 @@ class InventoryProvider extends ChangeNotifier {
   String get companyLogo => _companyLogo;
   String get companyName => _companyName;
   String get companyAddress => _companyAddress;
-  String get geminiApiKey => _geminiApiKey;
   bool get initialized => _initialized;
   Map<String, dynamic> get tagConfig => _tagConfig;
   List<Map<String, dynamic>> get customFieldsConfig => _customFieldsConfig;
@@ -60,13 +57,13 @@ class InventoryProvider extends ChangeNotifier {
     _companyLogo = _settingsBox.get('companyLogo', defaultValue: '') as String;
     _companyName = _settingsBox.get('companyName', defaultValue: '') as String;
     _companyAddress = _settingsBox.get('companyAddress', defaultValue: '') as String;
-    _geminiApiKey = _settingsBox.get('geminiApiKey', defaultValue: '') as String;
-    
+    await _settingsBox.delete('geminiApiKey'); // Remove legacy plaintext credentials.
+
     final savedTagConfig = _settingsBox.get('tagConfig');
     if (savedTagConfig != null && savedTagConfig is Map) {
       _tagConfig = Map<String, dynamic>.from(savedTagConfig);
     }
-    
+
     final savedCustomFields = _settingsBox.get('customFieldsConfig');
     if (savedCustomFields != null && savedCustomFields is List) {
       _customFieldsConfig = List<Map<String, dynamic>>.from(savedCustomFields.map((e) => Map<String, dynamic>.from(e)));
@@ -93,6 +90,7 @@ class InventoryProvider extends ChangeNotifier {
     if (s == 'OUT_OF_ORDER') return 'Out of Order';
     if (s == 'ASSIGNED') return 'Assigned';
     if (s == 'RETIRED') return 'Retired';
+    if (s == 'SCRAPPED') return 'Scrapped';
     return 'In Store';
   }
 
@@ -101,13 +99,14 @@ class InventoryProvider extends ChangeNotifier {
     if (s == 'Out of Order') return 'OUT_OF_ORDER';
     if (s == 'Assigned') return 'ASSIGNED';
     if (s == 'Retired') return 'RETIRED';
+    if (s == 'Scrapped') return 'SCRAPPED';
     return 'IN_STORE';
   }
 
   Future<void> syncWithServer(String token) async {
     _token = token;
     final api = AssetApiService(token: token);
-    
+
     final wData = await api.getWorkstations();
     final pData = await api.getPeripherals();
     final personnelData = await api.getPersonnel();
@@ -133,15 +132,16 @@ class InventoryProvider extends ChangeNotifier {
     try {
       final uData = await api.getUsers();
       _users = uData.map((e) => User(
-        id: e['email'] ?? '', 
-        name: e['fullName'] ?? 'Unknown', 
-        department: e['role'] ?? 'User', 
-        email: e['email'] ?? '', 
-        password: '', 
+        id: e['email'] ?? '',
+        name: e['fullName'] ?? 'Unknown',
+        department: e['role'] ?? 'User',
+        email: e['email'] ?? '',
+        password: '',
         isAdmin: e['role'] == 'ADMIN'
       )).toList();
     } catch (_) {
-      // Non-admin users can't read /api/users — keep existing list
+      _users = [];
+      // Do not retain administrator-only account records after switching users.
       debugPrint('Skipped /api/users sync (non-admin or network error)');
     }
 
@@ -160,16 +160,16 @@ class InventoryProvider extends ChangeNotifier {
         category: 'Workstation',
         serial: '',
         status: _mapStatus(w['status'] ?? ''),
-        assignee: w['userName'] ?? '', 
+        assignee: w['userName'] ?? '',
         customFields: w['custom_fields'] ?? w,
         dateAdded: w['assignedDate']?.toString().split('T')[0] ?? '',
       ));
       _tags.add(AssetTag(
-        id: tag, tagNumber: tag, assetId: tag, purchaseDate: w['assignedDate']?.toString().split('T')[0] ?? '', 
-        deviceType: w['deviceType'] ?? 'Workstation', itemCategory: 'Workstation', 
-        modelName: tag, quantity: 1, vendorName: '', requestedBy: '', purchaseCost: '', 
-        warrantyExpiry: '', department: '', notes: w['notes'] ?? '', createdAt: '', 
-        username: w['userName'] ?? '', cpu: w['processorGen'] ?? '', motherboard: w['motherboard'] ?? '', 
+        id: tag, tagNumber: tag, assetId: tag, purchaseDate: w['assignedDate']?.toString().split('T')[0] ?? '',
+        deviceType: w['deviceType'] ?? 'Workstation', itemCategory: 'Workstation',
+        modelName: tag, quantity: 1, vendorName: '', requestedBy: '', purchaseCost: '',
+        warrantyExpiry: '', department: '', notes: w['notes'] ?? '', createdAt: '',
+        username: w['userName'] ?? '', cpu: w['processorGen'] ?? '', motherboard: w['motherboard'] ?? '',
         storage: w['ssd'] ?? '', ram: w['ram'] ?? '', gpu: w['gpu'] ?? ''
       ));
     }
@@ -187,10 +187,10 @@ class InventoryProvider extends ChangeNotifier {
         dateAdded: p['purchaseDate']?.toString().split('T')[0] ?? '',
       ));
       _tags.add(AssetTag(
-        id: tag, tagNumber: tag, assetId: tag, purchaseDate: p['purchaseDate']?.toString().split('T')[0] ?? '', 
-        deviceType: p['brandManufacturer'] ?? 'Peripheral', itemCategory: p['category'] ?? 'Peripheral', 
-        modelName: p['modelSpecs'] ?? '', quantity: p['quantity'] ?? 1, vendorName: '', requestedBy: '', 
-        purchaseCost: '', warrantyExpiry: p['warrantyExpiry']?.toString().split('T')[0] ?? '', 
+        id: tag, tagNumber: tag, assetId: tag, purchaseDate: p['purchaseDate']?.toString().split('T')[0] ?? '',
+        deviceType: p['brandManufacturer'] ?? 'Peripheral', itemCategory: p['category'] ?? 'Peripheral',
+        modelName: p['modelSpecs'] ?? '', quantity: p['quantity'] ?? 1, vendorName: '', requestedBy: '',
+        purchaseCost: '', warrantyExpiry: p['warrantyExpiry']?.toString().split('T')[0] ?? '',
         department: '', notes: '', createdAt: '', username: p['personnel']?['fullName'] ?? p['workstation']?['personnel']?['fullName'] ?? '', cpu: '', motherboard: '',
         storage: p['storageCapacity'] ?? '', ram: '', gpu: p['gpuSpecs'] ?? ''
       ));
@@ -224,10 +224,10 @@ class InventoryProvider extends ChangeNotifier {
     required int quantity,
   }) async {
     return await generateAssetTags(
-        purchaseDate: DateTime.now().toIso8601String(), 
-        deviceType: category, 
-        itemCategory: category, 
-        modelName: model, 
+        purchaseDate: DateTime.now().toIso8601String(),
+        deviceType: category,
+        itemCategory: category,
+        modelName: model,
         quantity: quantity);
   }
 
@@ -281,12 +281,12 @@ class InventoryProvider extends ChangeNotifier {
   }) async {
     if (_token == null) return;
     final api = AssetApiService(token: _token!);
-    
+
     final oldAsset = assets.firstWhere((a) => a.id == id);
     if (oldAsset.status != status) {
       await api.updateAssetStatus(oldAsset.category.toLowerCase() == 'workstation' ? 'workstation' : 'peripheral', id, _unmapStatus(status));
     }
-    
+
     if (category.toLowerCase() == 'workstation') {
       await api.updateWorkstation(id, {
         'userName': assignee.isEmpty ? null : assignee,
@@ -348,7 +348,7 @@ class InventoryProvider extends ChangeNotifier {
     for (int i = 0; i < quantity; i++) {
       String id;
       do { id = _generateShortId(); } while (assets.any((a) => a.id == id) || ids.contains(id));
-      
+
       if (itemCategory.toLowerCase() == 'workstation') {
         await api.createWorkstation({
           'workstationTag': id,
@@ -506,12 +506,6 @@ class InventoryProvider extends ChangeNotifier {
     _companyAddress = address;
     await _settingsBox.put('companyName', name);
     await _settingsBox.put('companyAddress', address);
-    notifyListeners();
-  }
-
-  Future<void> saveGeminiApiKey(String key) async {
-    _geminiApiKey = key;
-    await _settingsBox.put('geminiApiKey', key);
     notifyListeners();
   }
 

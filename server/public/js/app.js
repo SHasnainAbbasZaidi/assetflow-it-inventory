@@ -7,6 +7,7 @@ let currentTab = 'dashboard';
 let currentSettingsSubTab = 'company';
 let pendingCompanyLogo = null;
 let globalSearchRecords = null;
+let dataLoadError = null;
 const defaultAppFavicon = document.getElementById('appFavicon')?.getAttribute('href') || '';
 
 // In-memory data store
@@ -256,7 +257,7 @@ function setupEventListeners() {
 function switchTab(tab) {
     document.body.classList.remove('navigation-open');
     document.querySelector('.mobile-menu')?.setAttribute('aria-expanded','false');
-    if (tab === 'settings' && currentUser?.role !== 'ADMIN') {
+    if (tab === 'reports' && currentUser?.role !== 'ADMIN') {
         showToast('Settings are restricted to Administrators.', 'error');
         return;
     }
@@ -268,6 +269,7 @@ function switchTab(tab) {
 
     const container = document.getElementById('viewContainer');
     if (!container) return;
+    if (dataLoadError && !['settings'].includes(tab)) { container.innerHTML = '<div class="settings-pane"><h2>Data could not be loaded</h2><p>Your records have not been replaced. Check the server connection and database status.</p><button class="btn btn-primary" onclick="loadAllData().then(() => switchTab(currentTab))">Retry</button></div>'; return; }
 
     if (tab === 'dashboard') renderDashboard(container);
     else if (tab === 'workstations') renderWorkstations(container);
@@ -276,6 +278,7 @@ function switchTab(tab) {
     else if (tab === 'logs') renderLogs(container);
     else if (tab === 'excel') renderExcelTools(container);
     else if (tab === 'settings') renderSettings(container);
+    else if (tab === 'reports') AdminTools.reports(container);
 }
 
 // Data Fetching
@@ -294,6 +297,7 @@ async function loadAllData() {
         }
 
         const results = await Promise.all(promises);
+        dataLoadError = null;
         data.workstations = results[0] || [];
         data.peripherals = results[1] || [];
         data.personnel = results[2] || [];
@@ -306,7 +310,8 @@ async function loadAllData() {
             data.users = results[6] || [];
         }
     } catch (err) {
-        console.error('Failed to load data:', err);
+        dataLoadError = true;
+        console.error('Failed to load application data.');
     }
 }
 
@@ -460,7 +465,7 @@ function renderWorkstations(container) {
                         <option value="IN_STORE">In Store</option>
                         <option value="ASSIGNED">Assigned</option>
                         <option value="OUT_OF_ORDER">Out of Order</option>
-                        <option value="RETIRED">Retired</option>
+                        <option value="RETIRED">Retired</option><option value="SCRAPPED">Scrapped</option>
                     </select>
                 </div>
             </div>
@@ -498,8 +503,8 @@ function generateWorkstationsRows(workstations) {
         <tr>
             <td>${TagStudio.checkbox('workstation', ws.workstationTag)} <span class="tag-badge" style="color: #818cf8;">${escapeHtml(ws.workstationTag)}</span></td>
             <td>
-                ${assignedName 
-                    ? `<a href="javascript:void(0)" onclick="openPersonnelOwnershipModal('${ws.personnelId || ''}')" style="color: #38bdf8; font-weight: 500; text-decoration: none;"><i class="ph ph-user" style="margin-right: 4px;"></i> ${escapeHtml(assignedName)}</a>` 
+                ${assignedName
+                    ? `<a href="javascript:void(0)" onclick="openPersonnelOwnershipModal('${ws.personnelId || ''}')" style="color: #38bdf8; font-weight: 500; text-decoration: none;"><i class="ph ph-user" style="margin-right: 4px;"></i> ${escapeHtml(assignedName)}</a>`
                     : '<span style="color: var(--text-muted);">Unassigned</span>'}
             </td>
             <td>${escapeHtml(ws.deviceType || 'PC / Workstation')}</td>
@@ -516,7 +521,7 @@ function generateWorkstationsRows(workstations) {
                     <button class="icon-btn" title="View Details" onclick="lookupAsset('${escapeHtml(ws.workstationTag)}')"><i class="ph ph-eye"></i></button>
                     ${!isViewer ? `<button class="icon-btn" title="Edit Workstation" onclick="editWorkstation('${escapeHtml(ws.workstationTag)}')"><i class="ph ph-pencil-simple"></i></button>` : ''}
                     <button class="icon-btn" title="Print Tag" onclick="printTag('${escapeHtml(ws.workstationTag)}', 'workstation')"><i class="ph ph-printer"></i></button>
-                    ${!isViewer ? (ws.status === 'RETIRED' 
+                    ${!isViewer && ws.status !== 'SCRAPPED' ? (ws.status === 'RETIRED'
                         ? `<button class="btn btn-sm btn-success" onclick="restoreAsset('workstation', '${escapeHtml(ws.workstationTag)}')">Restore</button>`
                         : `<button class="btn btn-sm btn-danger" onclick="retireAsset('workstation', '${escapeHtml(ws.workstationTag)}')">Retire</button>`
                     ) : ''}
@@ -532,7 +537,7 @@ function filterWorkstations() {
 
     const filtered = data.workstations.filter(ws => {
         const assignedName = (ws.personnel?.fullName || ws.userName || '').toLowerCase();
-        const matchesQuery = !q || 
+        const matchesQuery = !q ||
             ws.workstationTag.toLowerCase().includes(q) ||
             assignedName.includes(q) ||
             (ws.processorGen && ws.processorGen.toLowerCase().includes(q)) ||
@@ -580,7 +585,7 @@ function renderPeripherals(container) {
                         <option value="IN_STORE">In Store</option>
                         <option value="ASSIGNED">Assigned</option>
                         <option value="OUT_OF_ORDER">Out of Order</option>
-                        <option value="RETIRED">Retired</option>
+                        <option value="RETIRED">Retired</option><option value="SCRAPPED">Scrapped</option>
                     </select>
                 </div>
             </div>
@@ -625,13 +630,13 @@ function generatePeripheralsRows(peripherals) {
                 <div style="font-size: 11px; color: var(--text-muted);">${escapeHtml(p.brandManufacturer || '')}</div>
             </td>
             <td>
-                ${p.workstationTag 
+                ${p.workstationTag
                     ? `<a href="javascript:void(0)" onclick="lookupAsset('${escapeHtml(p.workstationTag)}')" style="color: var(--accent); text-decoration: none; font-weight: 600;"><i class="ph ph-desktop"></i> ${escapeHtml(p.workstationTag)}</a>`
                     : `<span style="color: var(--text-muted);">Standalone</span>`
                 }
             </td>
             <td>
-                ${assignedPerson 
+                ${assignedPerson
                     ? `<span style="color: #38bdf8; font-size: 12.5px;"><i class="ph ph-user"></i> ${escapeHtml(assignedPerson)}</span>`
                     : `<span style="color: var(--text-muted);">—</span>`}
             </td>
@@ -642,7 +647,7 @@ function generatePeripheralsRows(peripherals) {
                     <button class="icon-btn" title="View Details" onclick="lookupAsset('${escapeHtml(p.peripheralTag)}')"><i class="ph ph-eye"></i></button>
                     ${!isViewer ? `<button class="icon-btn" title="Edit Peripheral" onclick="editPeripheral('${escapeHtml(p.peripheralTag)}')"><i class="ph ph-pencil-simple"></i></button>` : ''}
                     <button class="icon-btn" title="Print Tag" onclick="printTag('${escapeHtml(p.peripheralTag)}', 'peripheral')"><i class="ph ph-printer"></i></button>
-                    ${!isViewer ? (p.status === 'RETIRED' 
+                    ${!isViewer && p.status !== 'SCRAPPED' ? (p.status === 'RETIRED'
                         ? `<button class="btn btn-sm btn-success" onclick="restoreAsset('peripheral', '${escapeHtml(p.peripheralTag)}')">Restore</button>`
                         : `<button class="btn btn-sm btn-danger" onclick="retireAsset('peripheral', '${escapeHtml(p.peripheralTag)}')">Retire</button>`
                     ) : ''}
@@ -827,9 +832,9 @@ async function openPersonnelOwnershipModal(id) {
                                 ${statusBadge(ws.status)}
                             </div>
                             <div style="font-size: 13px; color: var(--text-secondary);">
-                                <strong>Device:</strong> ${escapeHtml(ws.deviceType || 'PC')} • 
-                                <strong>CPU:</strong> ${escapeHtml(ws.processorGen || 'N/A')} • 
-                                <strong>RAM:</strong> ${escapeHtml(ws.ram || 'N/A')} • 
+                                <strong>Device:</strong> ${escapeHtml(ws.deviceType || 'PC')} •
+                                <strong>CPU:</strong> ${escapeHtml(ws.processorGen || 'N/A')} •
+                                <strong>RAM:</strong> ${escapeHtml(ws.ram || 'N/A')} •
                                 <strong>Storage:</strong> ${escapeHtml(ws.ssd || ws.hdd || 'N/A')}
                             </div>
                             ${ws.peripherals && ws.peripherals.length ? `
@@ -857,7 +862,7 @@ async function openPersonnelOwnershipModal(id) {
                     ${allPeripherals.map(p => `
                         <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 8px; border: 1px solid var(--border-subtle); font-size: 13px;">
                             <div>
-                                <strong style="color: #34d399;">${escapeHtml(p.peripheralTag)}</strong> • 
+                                <strong style="color: #34d399;">${escapeHtml(p.peripheralTag)}</strong> •
                                 ${escapeHtml(p.category || 'Peripheral')} (${escapeHtml(p.modelSpecs || p.brandManufacturer || '')})
                                 <span style="font-size: 11px; color: var(--text-muted); margin-left: 6px;">[via ${escapeHtml(p.hostWorkstation)}]</span>
                             </div>
@@ -944,6 +949,7 @@ async function deletePersonnel(id) {
 // 5. SETTINGS TAB (Admin-Only Centralized Configuration)
 // =====================================================================
 function renderSettings(container) {
+    if (currentUser?.role !== 'ADMIN') { AITools.open(container); return; }
     container.innerHTML = `
         <div class="page-header">
             <div class="page-title">
@@ -954,9 +960,11 @@ function renderSettings(container) {
 
         <div class="settings-container">
             <select class="mobile-settings-select select-filter" aria-label="Settings category" onchange="switchSettingsSubTab(this.value)">
-              ${[['company','Company Details & Logo'],['tags','Custom Tag Generator'],['tag-design','Tag Customizer'],['custom-fields','Custom Field Creator'],['users','Users & Access'],['themes','Themes & Personalization'],['mobile','Mobile APK Distribution']].map(([value,label])=>`<option value="${value}" ${currentSettingsSubTab===value?'selected':''}>${label}</option>`).join('')}
+              ${[['ai','AI API Keys'],['company','Company Details & Logo'],['tags','Custom Tag Generator'],['tag-design','Tag Customizer'],['custom-fields','Custom Field Creator'],['users','Users & Access'],['themes','Themes & Personalization'],['mobile','Mobile APK Distribution'],['backups','Backup and Restore'],['super-delete','Super Power Delete']].map(([value,label])=>`<option value="${value}" ${currentSettingsSubTab===value?'selected':''}>${label}</option>`).join('')}
             </select>
-            <div class="settings-subnav">
+            <div class="settings-subnav"><button class="subnav-btn" onclick="switchSettingsSubTab('ai')">AI API Keys</button>
+                <button class="subnav-btn ${currentSettingsSubTab === 'backups' ? 'active' : ''}" onclick="switchSettingsSubTab('backups')"><i class="ph ph-database"></i> Backup and Restore</button>
+                <button class="subnav-btn ${currentSettingsSubTab === 'super-delete' ? 'active' : ''}" onclick="switchSettingsSubTab('super-delete')"><i class="ph ph-trash"></i> Super Power Delete</button>
                 <button class="subnav-btn ${currentSettingsSubTab === 'company' ? 'active' : ''}" onclick="switchSettingsSubTab('company')">
                     <i class="ph ph-buildings"></i> Company Details & Logo
                 </button>
@@ -985,7 +993,7 @@ function renderSettings(container) {
     `;
 
     renderSettingsSubPane();
-    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits">Developed by MAH Systems Inc.<br>Developer: Hasnain Zaidi</footer>');
+    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits">A product of Mahzaidex Tech<br>Developed by Hasnain Zaidi</footer>');
 }
 
 function switchSettingsSubTab(subTab) {
@@ -998,8 +1006,12 @@ function switchSettingsSubTab(subTab) {
 }
 
 function renderSettingsSubPane() {
+    if (currentUser?.role !== 'ADMIN') return;
     const pane = document.getElementById('settingsPaneContainer');
     if (!pane) return;
+    if (currentSettingsSubTab === 'ai') { AITools.open(pane); return; }
+    if (currentSettingsSubTab === 'backups') { AdminTools.backups(pane); return; }
+    if (currentSettingsSubTab === 'super-delete') { AdminTools.deletePane(pane); return; }
     if (currentSettingsSubTab === 'themes') {
         pane.innerHTML = `<div class="settings-pane"><h3>Themes & Personalization</h3><form onsubmit="saveThemeSettings(event)" class="branding-fields">
           <div class="form-group"><label for="themeMode">Theme</label><select id="themeMode">${[['dark','Dark Nebula'],['midnight','Midnight Blue'],['onyx','Onyx Minimal']].map(([value,label]) => `<option value="${value}" ${data.settings.themeMode === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
@@ -1183,7 +1195,10 @@ function renderSettingsSubPane() {
                 </div>
             </div>
         `;
-    } else if (currentSettingsSubTab === 'themes') {
+    } else if (currentSettingsSubTab === 'ai') { AITools.open(pane); return; }
+    if (currentSettingsSubTab === 'backups') { AdminTools.backups(pane); return; }
+    if (currentSettingsSubTab === 'super-delete') { AdminTools.deletePane(pane); return; }
+    if (currentSettingsSubTab === 'themes') {
         pane.innerHTML = `
             <div class="settings-pane">
                 <div>
@@ -1688,7 +1703,7 @@ async function lookupAsset(tag) {
         const asset = res.data;
 
         document.getElementById('lookupModalTitle').textContent = `${isWs ? 'Workstation' : 'Peripheral'}: ${isWs ? asset.workstationTag : asset.peripheralTag}`;
-        
+
         let bodyHtml = `
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
                 <span class="tag-badge" style="font-size: 18px; color: ${isWs ? '#818cf8' : '#34d399'};">${isWs ? asset.workstationTag : asset.peripheralTag}</span>
@@ -1749,7 +1764,7 @@ async function lookupAsset(tag) {
         footer.innerHTML = `
             <button class="btn btn-secondary" onclick="closeModal('lookupModal')">Close</button>
             <button class="btn btn-secondary" onclick="printTag('${isWs ? asset.workstationTag : asset.peripheralTag}', '${isWs ? 'workstation' : 'peripheral'}')"><i class="ph ph-printer"></i> Print Tag</button>
-            ${!isViewer ? (asset.status === 'RETIRED'
+            ${!isViewer && asset.status !== 'SCRAPPED' ? (asset.status === 'RETIRED'
                 ? `<button class="btn btn-success" onclick="restoreAsset('${isWs ? 'workstation' : 'peripheral'}', '${isWs ? asset.workstationTag : asset.peripheralTag}'); closeModal('lookupModal');">Restore Asset</button>`
                 : `<button class="btn btn-danger" onclick="retireAsset('${isWs ? 'workstation' : 'peripheral'}', '${isWs ? asset.workstationTag : asset.peripheralTag}'); closeModal('lookupModal');">Retire Asset</button>`
             ) : ''}
@@ -1990,6 +2005,7 @@ function statusBadge(status) {
     if (status === 'IN_STORE') return `<span class="badge badge-instore"><i class="ph ph-check-circle"></i> In Store</span>`;
     if (status === 'ASSIGNED') return `<span class="badge badge-assigned"><i class="ph ph-user"></i> Assigned</span>`;
     if (status === 'OUT_OF_ORDER') return `<span class="badge badge-outoforder"><i class="ph ph-wrench"></i> Out of Order</span>`;
+    if (status === 'SCRAPPED') return '<span class="badge badge-retired">Scrapped</span>';
     if (status === 'RETIRED') return `<span class="badge badge-retired"><i class="ph ph-archive"></i> Retired</span>`;
     return `<span class="badge badge-instore">${escapeHtml(status || 'In Store')}</span>`;
 }

@@ -1,4 +1,7 @@
 # Secrets
+/server/Backup/
+/server/AutomaticBackups/
+/server/ManualBackups/
 .env
 .env.*
 !.env.example
@@ -33,6 +36,7 @@ server/public/uploads/
 .packages
 build/
 android/.gradle/
+android/.kotlin/
 android/local.properties
 
 # Local development tools and compiled applications
@@ -54,3 +58,5 @@ Thumbs.db
 # Compiled and generated Flutter artifacts
 *.exe
 /inventory_manager_flutter/build_log*.txt
+
+.assetflow-ai.key

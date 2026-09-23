@@ -14,6 +14,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  for(let i=0;i<5;i++)await prisma.workstation.create({data:{workstationTag:'QA-WS-'+i,deviceType:'Design Workstation',processorGen:'Test CPU',status:'IN_STORE'}});
  for(let i=0;i<9;i++)await prisma.peripheral.create({data:{peripheralTag:'QA-PER-'+i,category:'Monitor',modelSpecs:'Design Display',status:'IN_STORE'}});
  console.log('Fixture ready');
+ await prisma.appUser.upsert({where:{email:'qa'},create:{email:'qa',fullName:'QA',role:'ADMIN'},update:{role:'ADMIN'}});
  const token=jwt.sign({email:'qa',role:'ADMIN'},process.env.JWT_SECRET || 'assetflow-super-secret-production-key-2026');
  const browser=await chromium.launch({headless:true});
  try{
@@ -24,7 +25,7 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  await page.locator('#globalSearchInput').fill(' qa-ws- ');await page.waitForSelector('#globalSearchResults button');assert.equal(await page.locator('#globalSearchResults button').count(),5);
  await page.locator('#globalSearchInput').fill('  ');await page.waitForFunction(()=>!document.querySelector('#globalSearchResults'));
  await page.locator('[data-tab="settings"]').click();await page.locator('.subnav-btn').filter({hasText:'Tag Customizer'}).click();
- await page.locator('#studioStage svg').waitFor();assert.ok(await page.getByText('Developed by MAH Systems Inc.',{exact:false}).count());
+ await page.locator('#studioStage svg').waitFor();assert.ok(await page.getByText('A product of Mahzaidex Tech',{exact:false}).count());
  await page.getByRole('button',{name:'Add text',exact:true}).click();await page.locator('[data-prop="text"]').fill('QA editor text');await page.locator('[data-prop="text"]').dispatchEvent('change');
  await page.locator('#templateName').fill('QA custom template');await page.locator('#templateName').dispatchEvent('change');
  await page.getByRole('button',{name:'Save Template',exact:true}).click();await page.getByText('Template saved and selected for printing',{exact:true}).waitFor();

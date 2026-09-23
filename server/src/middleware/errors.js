@@ -4,7 +4,7 @@ export function notFound(req, res) {
 
 export function errorHandler(error, req, res, next) { // eslint-disable-line no-unused-vars
   const status = error.status || (error.code === 'P2002' ? 409 : error.code === 'P2025' ? 404 : 500);
-  if (status >= 500) console.error(error);
+  if (status >= 500) console.error('Request failed', {status, code: error.code || 'INTERNAL_ERROR'});
   res.status(status).json({
     error: {
       code: error.code || (status === 500 ? 'INTERNAL_ERROR' : 'REQUEST_ERROR'),

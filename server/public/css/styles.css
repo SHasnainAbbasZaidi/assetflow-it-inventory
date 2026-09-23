@@ -1217,3 +1217,18 @@ tr:hover td {
         box-shadow: none !important;
     }
 }
+
+/* Mahzaidex Tech — administration tools */
+.admin-form-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin:20px 0; }
+.admin-form-grid label { display:flex; flex-direction:column; gap:8px; }
+.admin-form-grid select,.admin-form-grid input { width:100%; min-height:44px; padding:10px; color:var(--text-primary); background:var(--bg-secondary,#111827); border:1px solid #374151; border-radius:8px; }
+.admin-actions { display:flex; flex-wrap:wrap; gap:12px; margin:20px 0; }
+.backup-row { display:flex; flex-wrap:wrap; align-items:center; gap:12px; padding:14px 0; border-bottom:1px solid #374151; }
+.backup-row>div { flex:1; min-width:180px; overflow-wrap:anywhere; }
+.backup-row small { display:block; opacity:.65; font-size:11px; margin-top:5px; }
+.product-credit { display:block; font-size:10px; opacity:.5; margin-bottom:12px; }
+#reportPreview .table-container { overflow:auto; max-height:60vh; }
+
+.ai-key-form { border-bottom:1px solid var(--border-subtle); padding:18px 0; }
+.ai-key-form label,#aiAnalyze label {display:block;margin:12px 0;}
+.ai-key-form input,#aiAnalyze textarea,#aiAnalyze select {display:block;width:100%;max-width:620px;padding:12px;background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border-subtle);border-radius:8px;}

@@ -43,7 +43,8 @@ test('safe additive migration and assignment API service on an isolated database
     const server=app.listen(0,'127.0.0.1');await new Promise(resolve=>server.once('listening',resolve));
     try {
       const base=`http://127.0.0.1:${server.address().port}`;
-      const token=role=>jwt.sign({email:'test',role},process.env.JWT_SECRET || 'assetflow-super-secret-production-key-2026');
+      for (const role of ['ADMIN','VIEWER']) await prisma.appUser.create({data:{email:'test-'+role,fullName:'Test',role}});
+      const token=role=>jwt.sign({email:'test-'+role,role},process.env.JWT_SECRET || 'assetflow-super-secret-production-key-2026');
       const endpoint=`${base}/api/assets/workstation/${id}/assign`;
       assert.equal((await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'})).status,401);
       assert.equal((await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+token('VIEWER')},body:'{}'})).status,403);

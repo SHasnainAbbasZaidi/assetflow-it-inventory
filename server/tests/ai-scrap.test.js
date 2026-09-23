@@ -1,0 +1,53 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import {DatabaseSync} from 'node:sqlite';
+import {PrismaClient} from '@prisma/client';
+import express from 'express';
+import ExcelJS from 'exceljs';
+import {createVault,aiRoutes,privateSetting} from '../src/services/ai-service.js';
+import {adminTools} from '../src/services/admin-tools.js';
+import {createBackupService,snapshot,stateWorkbook} from '../src/services/backup-service.js';
+import {errorHandler} from '../src/middleware/errors.js';
+
+test('encrypted personal AI keys stay private; scrap reports preserve facts and commit once',async()=>{
+ const root=await fs.mkdtemp(path.join(os.tmpdir(),'assetflow-ai-scrap-')),file=path.join(root,'test.db');
+ const db=new DatabaseSync(file);db.exec(await fs.readFile('prisma/initial-schema.sql','utf8'));db.close();
+ const prisma=new PrismaClient({datasources:{db:{url:'file:'+file.replaceAll('\\','/')}}});let server;
+ try{
+  for(const [email,role] of [['admin@test','ADMIN'],['viewer@test','VIEWER']])await prisma.appUser.create({data:{email,role,fullName:email,passwordHash:'test-only-hash'}});
+  await prisma.personnel.create({data:{id:'owner',fullName:'Original owner'}});
+  await prisma.workstation.create({data:{workstationTag:'WS-1',personnelId:'owner',status:'ASSIGNED',processorGen:'i7'}});
+  await prisma.peripheral.create({data:{peripheralTag:'PER-1',workstationTag:'WS-1',status:'ASSIGNED',modelSpecs:'Display',quantity:2}});
+  const vault=createVault(prisma,path.join(root,'master.key')),backups=createBackupService(prisma,root,vault.validate);
+  let calls=0;
+  const fake=async(url,options)=>{calls++;assert.ok(url.startsWith('https://api.openai.com/v1/responses'));assert.ok(!url.includes('test-provider-key'));assert.ok(!options.body.includes('test-provider-key'));assert.ok(!options.body.includes('Original owner'));assert.equal(options.headers.Authorization,'Bearer test-provider-key-12345');return {ok:true,json:async()=>({output:[{content:[{type:'output_text',text:'Analysis test-provider-key-12345'}]}]})};};
+  const app=express();app.use(express.json());app.use((req,res,next)=>{req.auth={email:req.headers['x-user']||'admin@test'};next();});app.use('/ai',aiRoutes(prisma,vault,fake));app.use('/admin',adminTools(prisma,backups));app.use(errorHandler);server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  const send=(route,body,method='POST',user='admin@test')=>fetch(base+route,{method,headers:{'Content-Type':'application/json','x-user':user},...(body?{body:JSON.stringify(body)}:{})});
+  assert.equal((await send('/ai/keys/openai',{apiKey:'test-provider-key-12345'},'PUT')).status,200);
+  const encrypted=await prisma.appSetting.findFirst({where:{key:{startsWith:'__ai:'}}});assert.ok(!encrypted.value.includes('test-provider-key'));assert.ok(privateSetting(encrypted.key));assert.equal((await fs.stat(path.join(root,'master.key'))).size,32);
+  const mine=await (await send('/ai/keys',null,'GET')).json();assert.ok(mine.find(k=>k.provider==='openai').configured);assert.ok(!JSON.stringify(mine).includes('test-provider-key'));
+  const other=await (await send('/ai/keys',null,'GET','viewer@test')).json();assert.ok(other.every(k=>!k.configured));
+  assert.equal((await createVault(prisma,path.join(root,'master.key')).get('admin@test','openai')).apiKey,'test-provider-key-12345');
+  await assert.rejects(createVault(prisma,path.join(root,'missing.key')).get('admin@test','openai'),{status:503});
+  const response=await send('/ai/analyze',{provider:'openai',question:'Summarize stock',consent:true});assert.equal(response.status,200);assert.equal((await response.json()).text,'Analysis [redacted]');assert.equal(calls,1);
+  assert.equal((await send('/ai/analyze',{provider:'openai',question:'test',consent:false})).status,400);
+  const book=new ExcelJS.Workbook();await book.xlsx.load(await stateWorkbook(await snapshot(prisma)));assert.ok(!JSON.stringify(book.worksheets.map(s=>s.getSheetValues())).includes('__ai:'));
+  const saved=await snapshot(prisma);await assert.rejects(createBackupService(prisma,root,createVault(prisma,path.join(root,'wrong.key')).validate).restore(saved),{status:503});
+  assert.equal((await send('/admin/scrap/preview',{tags:'WS-1'},'POST','viewer@test')).status,403);
+  assert.equal((await send('/admin/scrap/preview',{tags:'WS-1'})).status,409);
+  assert.equal((await send('/admin/scrap/preview',{tags:'PER-1 UNKNOWN'})).status,404);assert.equal((await prisma.peripheral.findUnique({where:{peripheralTag:'PER-1'}})).status,'ASSIGNED');
+  const preview=await (await send('/admin/scrap/preview',{tags:'WS-1,PER-1\nPER-1'})).json();assert.equal(preview.rows.length,2);assert.equal(preview.rows[0].person,'Original owner');
+  const body={tags:'WS-1 PER-1',fingerprint:preview.fingerprint,requestId:crypto.randomUUID()};
+  assert.equal((await send('/admin/scrap',{...body,fingerprint:'stale'})).status,409);
+  const result=await send('/admin/scrap',body);assert.equal(result.status,200);const report=await result.json();assert.equal(report.operator.email,'admin@test');assert.equal(report.rows[0].details.processorGen,'i7');
+  assert.equal((await send('/admin/scrap',body)).status,200);assert.equal(await prisma.auditLog.count(),2);assert.equal((await prisma.workstation.findUnique({where:{workstationTag:'WS-1'}})).status,'SCRAPPED');assert.equal((await prisma.peripheral.findUnique({where:{peripheralTag:'PER-1'}})).workstationTag,null);
+  assert.equal((await send('/admin/scrap/preview',{tags:'PER-1'})).status,409);
+  const reportBook=new ExcelJS.Workbook();await reportBook.xlsx.load(Buffer.from(await (await send('/admin/scrap/'+report.id+'?format=xlsx',null,'GET')).arrayBuffer()));assert.equal(reportBook.worksheets[0].getCell('C3').value,'admin@test');assert.equal(reportBook.worksheets[0].rowCount,7);
+  assert.equal((await send('/ai/keys/openai',null,'DELETE')).status,204);assert.equal(await prisma.appSetting.count({where:{key:{startsWith:'__ai:'}}}),0);
+ }finally{if(server)await new Promise(r=>server.close(r));await prisma.$disconnect();await fs.rm(root,{recursive:true,force:true});}
+});

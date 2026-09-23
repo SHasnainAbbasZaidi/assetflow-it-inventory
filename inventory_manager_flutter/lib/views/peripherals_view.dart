@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:inventory_manager_flutter/models/asset.dart';
-import 'package:inventory_manager_flutter/models/user.dart';
 import 'package:inventory_manager_flutter/services/database_service.dart';
 import 'package:inventory_manager_flutter/utils/asset_category_schemas.dart';
 import 'package:inventory_manager_flutter/views/asset_qr_dialog.dart';
@@ -26,8 +25,8 @@ class _PeripheralsViewState extends State<PeripheralsView> {
 
   Future<void> _exportCSV(BuildContext context) async {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
-    final csv = provider.getCSVContent(); 
-    
+    final csv = provider.getCSVContent();
+
     try {
       await saveAndLaunchFile(utf8.encode(csv), 'peripherals_export.csv', mimeType: 'text/csv');
       if (context.mounted) {
@@ -104,7 +103,7 @@ class _PeripheralsViewState extends State<PeripheralsView> {
       barrierDismissible: false,
       builder: (context) => AssetFormDialog(
         asset: asset,
-        category: 'Peripheral', 
+        category: 'Peripheral',
       ),
     );
   }
@@ -120,7 +119,6 @@ class _PeripheralsViewState extends State<PeripheralsView> {
   Widget build(BuildContext context) {
     final provider = Provider.of<InventoryProvider>(context);
     final assets = provider.peripherals;
-    final users = provider.users;
 
     final filteredAssets = assets.where((asset) {
       final query = widget.searchQuery.toLowerCase();
@@ -257,7 +255,7 @@ class _PeripheralsViewState extends State<PeripheralsView> {
                                     statusBg = const Color(0xFFEF4444).withOpacity(0.12);
                                 }
 
-                                final bool isRetired = asset.status == 'Retired';
+                                final bool isRetired = ['Retired', 'Scrapped'].contains(asset.status);
 
                                 return DataRow(
                                   selected: _selectedAssetIds.contains(asset.id),
@@ -330,12 +328,12 @@ class _PeripheralsViewState extends State<PeripheralsView> {
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.edit_outlined, size: 20),
-                                            onPressed: () => _openAssetForm(context, asset),
+                                            onPressed: asset.status == 'Scrapped' ? null : () => _openAssetForm(context, asset),
                                             tooltip: 'Edit Asset',
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.delete_outline, size: 20, color: Color(0xFFEF4444)),
-                                            onPressed: () {
+                                            onPressed: asset.status == 'Scrapped' ? null : () {
                                               showDialog(
                                                 context: context,
                                                 builder: (ctx) => AlertDialog(
@@ -415,7 +413,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     _assignee = widget.asset?.assignee ?? '';
     _customFields = Map<String, dynamic>.from(widget.asset?.customFields ?? {});
   }
-  
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -425,7 +423,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
   void _initializeCustomControllers(BuildContext context) {
     if (_customControllers.isNotEmpty) return;
     final provider = Provider.of<InventoryProvider>(context, listen: false);
-    
+
     // Core fields
     final coreFields = AssetCategorySchemas.schemas[_category] ?? [];
     for (final field in coreFields) {
@@ -453,7 +451,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
   Widget build(BuildContext context) {
     final provider = Provider.of<InventoryProvider>(context);
     final isEdit = widget.asset != null;
-    
+
     final coreFields = AssetCategorySchemas.schemas[_category] ?? [];
     final dynamicFields = provider.customFieldsConfig.where((f) => f['target'] == 'Peripheral').toList();
 
@@ -517,7 +515,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
                     style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF6366F1)),
                   ),
                   const Divider(color: Color(0xFF6366F1), height: 16, thickness: 1),
-                  
+
                   // Render core fields
                   ...coreFields.map((field) {
                     final id = field['id']!;
@@ -532,7 +530,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
                       ),
                     );
                   }),
-                  
+
                   // Render dynamic fields
                   ...dynamicFields.map((field) {
                     final id = field['id'] as String;
@@ -561,7 +559,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               _formKey.currentState!.save();
-              
+
               final customData = <String, dynamic>{};
               _customControllers.forEach((key, controller) {
                 customData[key] = controller.text.trim();
@@ -570,7 +568,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
               if (isEdit) {
                 await provider.updateAsset(
                   widget.asset!.id,
-                  name: _name, 
+                  name: _name,
                   category: _category,
                   serial: '',
                   status: _status,

@@ -1,3 +1,5 @@
+import 'ai_settings_view.dart';
+import 'admin_tools_view.dart';
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
@@ -19,7 +21,6 @@ class SettingsView extends StatefulWidget {
 class _SettingsViewState extends State<SettingsView> {
   String _currentLogoBase64 = '';
   Uint8List? _logoBytes;
-  final _geminiApiController = TextEditingController();
   final _companyNameController = TextEditingController();
   int _category = 0;
   final _companyAddressController = TextEditingController();
@@ -32,7 +33,6 @@ class _SettingsViewState extends State<SettingsView> {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
     final auth = Provider.of<AuthProvider>(context, listen: false);
     _currentLogoBase64 = provider.companyLogo;
-    _geminiApiController.text = provider.geminiApiKey;
     _companyNameController.text = provider.companyName;
     _companyAddressController.text = provider.companyAddress;
     _serverUrlController.text = auth.serverUrl;
@@ -41,7 +41,6 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   void dispose() {
-    _geminiApiController.dispose();
     _companyNameController.dispose();
     _companyAddressController.dispose();
     _serverUrlController.dispose();
@@ -117,7 +116,6 @@ class _SettingsViewState extends State<SettingsView> {
     await provider.saveBrandingLogo(_currentLogoBase64);
     await provider.saveCompanyDetails(_companyNameController.text.trim(),
         _companyAddressController.text.trim());
-    await provider.saveGeminiApiKey(_geminiApiController.text.trim());
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Settings saved successfully!')),
@@ -128,22 +126,30 @@ class _SettingsViewState extends State<SettingsView> {
   Widget build(BuildContext context) {
     final labels = [
       'Server connection',
-      'AI integrations',
+      'AI API Keys',
       'Company branding',
       'Tag customizer',
       'Custom fields',
-      'Users & access'
+      'Users & access',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Backup and Restore',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Super Power Delete'
     ];
     final panels = [
       _buildServerConfigCard(context),
-      _buildAIIntegrationsCard(context),
+      const AISettingsView(),
       _buildBrandingCard(context),
       _buildTagCustomizerCard(context),
       _buildCustomFieldsManagerCard(context),
       SizedBox(
           height: 520,
           child: AppUserManagementSection(
-              showHeader: true, onAddUser: () => _openAdminUserForm(context)))
+              showHeader: true, onAddUser: () => _openAdminUserForm(context))),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        const AdminToolsView(key: ValueKey('backups'), mode: 'backups'),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        const AdminToolsView(key: ValueKey('delete'), mode: 'delete')
     ];
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -166,9 +172,10 @@ class _SettingsViewState extends State<SettingsView> {
                         (i) =>
                             DropdownMenuItem(value: i, child: Text(labels[i]))),
                     onChanged: (i) => setState(() => _category = i ?? 0))),
-          panels[_category],
+          panels[_category < panels.length ? _category : 0],
           const SizedBox(height: 24),
-          const Text('Developed by MAH Systems Inc.\nDeveloper: Hasnain Zaidi',
+          const Text(
+              'A product of Mahzaidex Tech\nDeveloped by Hasnain Zaidi',
               style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
         ]);
         return Row(children: [
@@ -291,56 +298,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Widget _buildAIIntegrationsCard(BuildContext context) {
-    return Center(
-      child: SizedBox(
-        width: 760,
-        child: Card(
-          child: Padding(
-            padding: const EdgeInsets.all(28.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'AI Integrations',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleMedium
-                      ?.copyWith(fontSize: 20),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Configure Google Gemini Vision API to automatically extract item details from pictures.',
-                  style: TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _geminiApiController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Gemini API Key',
-                    hintText: 'Paste your API key here (AIzaSy...)',
-                    helperText:
-                        'Required for "Scan Item with Camera" feature in Tag Generator.',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _saveSettings(context),
-                    icon: const Icon(Icons.save_rounded, size: 18),
-                    label: const Text('Save Settings'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildBrandingCard(BuildContext context) {
     return Center(

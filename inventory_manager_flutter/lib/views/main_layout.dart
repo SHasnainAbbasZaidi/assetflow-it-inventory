@@ -1,3 +1,5 @@
+import 'admin_tools_view.dart';
+import '../providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventory_manager_flutter/services/database_service.dart';
@@ -68,6 +70,11 @@ class _MainLayoutState extends State<MainLayout> {
       'icon': Icons.settings_rounded,
       'view': const SettingsView()
     },
+    {
+      'title': 'Reports',
+      'icon': Icons.assessment_outlined,
+      'view': const AdminToolsView(mode: 'reports')
+    },
   ];
 
   void _onSearchChanged(String query) {
@@ -84,6 +91,8 @@ class _MainLayoutState extends State<MainLayout> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isDesktop = screenWidth >= 850;
 
+    final isAdmin = context.watch<AuthProvider>().currentUser?.isAdmin ?? false;
+    if (_currentIndex == 8 && !isAdmin) _currentIndex = 0;
     Widget currentView = _navItems[_currentIndex]['view'] as Widget;
     if (_searchController.text.trim().isNotEmpty)
       currentView = GlobalSearchView(query: _searchController.text);
@@ -193,6 +202,8 @@ class _MainLayoutState extends State<MainLayout> {
                           itemCount: _navItems.length,
                           itemBuilder: (context, index) {
                             final item = _navItems[index];
+                            if (item['title'] == 'Reports' && !isAdmin)
+                              return const SizedBox.shrink();
                             final isSelected = _currentIndex == index;
                             return ListTile(
                               leading: Icon(
@@ -267,6 +278,8 @@ class _MainLayoutState extends State<MainLayout> {
                           itemCount: _navItems.length,
                           itemBuilder: (context, index) {
                             final item = _navItems[index];
+                            if (item['title'] == 'Reports' && !isAdmin)
+                              return const SizedBox.shrink();
                             final isSelected = _currentIndex == index;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 6.0),
