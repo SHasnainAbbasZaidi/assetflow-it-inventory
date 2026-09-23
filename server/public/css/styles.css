@@ -820,16 +820,53 @@ tr:hover td {
 /* Settings Tabs Container */
 .settings-container {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 24px;
 }
 
 .settings-subnav {
     display: flex;
+    flex-direction: column;
+    flex: 0 0 220px;
     gap: 8px;
     border-bottom: 1px solid var(--border-subtle);
     padding-bottom: 12px;
     overflow-x: auto;
+    align-self:flex-start;
+    max-width:100%;
+}
+
+#settingsPaneContainer { flex:1; min-width:0; }
+.bulk-actions, .studio-tools { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin-bottom:16px; }
+.tag-select { width:20px; height:20px; vertical-align:middle; accent-color:var(--accent); }
+.studio button, .studio select, .studio input, .studio textarea { background:var(--bg-surface); color:var(--text-primary); border:1px solid var(--border-subtle); border-radius:6px; padding:8px; min-height:40px; }
+.studio button { cursor:pointer; }
+.studio label { display:flex; flex-direction:column; gap:5px; font-size:12px; }
+.studio-tools input[type=number] { width:80px; }
+.studio-workspace { display:grid; grid-template-columns:minmax(200px,1fr) 180px; gap:20px; }
+.studio-stage-scroll { background:#cbd5e1; padding:16px; overflow:auto; align-self:start; }
+#studioStage { width:100%; max-width:500px; touch-action:none; background:white; margin:auto; }
+#studioStage svg { display:block; }
+#studioStage:focus-visible { outline:3px solid var(--accent); }
+#studioInspector { display:flex; flex-direction:column; gap:8px; max-height:700px; overflow:auto; }
+.muted, .developer-credits { color:var(--text-secondary); font-size:12px; line-height:1.6; }
+.developer-credits { margin-top:24px; padding:16px 0; border-top:1px solid var(--border-subtle); }
+.search-bar { position:relative; }
+#globalSearchResults { position:absolute; top:100%; left:0; width:min(600px,85vw); max-height:400px; overflow:auto; background:var(--bg-surface); border:1px solid var(--border-subtle); padding:12px; z-index:100; box-shadow:0 10px 25px #0006; }
+#globalSearchResults button { display:block; text-align:left; width:100%; padding:12px; background:transparent; color:var(--text-primary); border:0; cursor:pointer; }
+#globalSearchResults button:hover,#globalSearchResults button:focus { background:var(--accent-light); }
+#tagPrintModal .modal-content { width:95vw; max-width:1200px; height:94vh; }
+#tagPrintModal .modal-body { display:block; padding:0!important; flex:1; min-height:0; }
+#tagPrintFrame { width:100%; height:100%; min-height:55vh; border:0; }
+@media(max-width:900px) {
+ .settings-container { flex-direction:column; }
+ .settings-subnav { flex-direction:row; flex-basis:auto; flex-wrap:wrap; }
+ .settings-pane { padding:18px; }
+ .studio-workspace { grid-template-columns:1fr; }
+ #studioInspector { display:grid; grid-template-columns:1fr 1fr; max-height:none; }
+ .top-header { padding:10px;gap:8px; }
+ .search-bar { width:100%; }
+ .btn, .icon-btn { min-height:44px; }
 }
 
 .subnav-btn {
@@ -976,6 +1013,24 @@ tr:hover td {
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+}
+
+.mobile-menu, .mobile-settings-select { display:none; }
+.main-content { min-width:0; }
+@media(max-width:900px) {
+ .mobile-menu { display:flex; flex-shrink:0; }
+ .sidebar { position:fixed; top:70px; bottom:0; left:0; height:calc(100vh - 70px); transform:translateX(-100%); transition:transform .2s; box-shadow:10px 0 40px #0008; }
+ .navigation-open .sidebar { transform:translateX(0); }
+ .view-container { padding:16px; }
+ .header-actions .user-badge { display:none; }
+ .page-header { flex-wrap:wrap; gap:12px; }
+ .settings-subnav { display:none; }
+ .mobile-settings-select { display:block; width:100%; min-height:44px; }
+ .studio-tools { gap:8px; }
+ .studio-tools label { max-width:100%; }
+ .studio input,.studio select,.studio textarea { max-width:100%;min-width:0; }
+ .studio-stage-scroll { padding:8px; }
+ #studioInspector { min-width:0; }
 }
 
 /* Ownership Cards */

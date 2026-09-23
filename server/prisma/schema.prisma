@@ -16,6 +16,7 @@ model Personnel {
   notes        String?
   createdAt    DateTime      @default(now()) @map("created_at")
   workstations Workstation[]
+  peripherals Peripheral[]
 
   @@map("personnel")
 }
@@ -47,6 +48,8 @@ model Peripheral {
   category          String?
   modelSpecs        String?      @map("model_specs")
   workstationTag    String?      @map("workstation_tag")
+  personnelId       String?      @map("personnel_id")
+  personnel         Personnel?   @relation(fields: [personnelId], references: [id], onDelete: SetNull)
   workstation       Workstation? @relation(fields: [workstationTag], references: [workstationTag], onUpdate: Cascade, onDelete: Restrict)
   status            String       @default("IN_STORE")
   purchaseDate      DateTime?    @map("purchase_date")
@@ -58,6 +61,7 @@ model Peripheral {
   customFields      String?      @map("custom_fields")
 
   @@map("peripherals")
+  @@index([personnelId], map: "peripherals_personnel_id_idx")
 }
 
 model AppUser {

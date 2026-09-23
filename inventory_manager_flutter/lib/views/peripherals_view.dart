@@ -306,7 +306,7 @@ class _PeripheralsViewState extends State<PeripheralsView> {
                                       ),
                                     ),
                                     DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text(asset.category))),
-                                    DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text(asset.assignee.isEmpty ? 'Unassigned' : asset.assignee))),
+                                    DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text(asset.customFields['personnel']?['fullName']?.toString() ?? (asset.assignee.isEmpty ? 'Unassigned' : asset.assignee)))),
                                     DataCell(
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

@@ -191,7 +191,7 @@ class InventoryProvider extends ChangeNotifier {
         deviceType: p['brandManufacturer'] ?? 'Peripheral', itemCategory: p['category'] ?? 'Peripheral', 
         modelName: p['modelSpecs'] ?? '', quantity: p['quantity'] ?? 1, vendorName: '', requestedBy: '', 
         purchaseCost: '', warrantyExpiry: p['warrantyExpiry']?.toString().split('T')[0] ?? '', 
-        department: '', notes: '', createdAt: '', username: '', cpu: '', motherboard: '', 
+        department: '', notes: '', createdAt: '', username: p['personnel']?['fullName'] ?? p['workstation']?['personnel']?['fullName'] ?? '', cpu: '', motherboard: '',
         storage: p['storageCapacity'] ?? '', ram: '', gpu: p['gpuSpecs'] ?? ''
       ));
     }

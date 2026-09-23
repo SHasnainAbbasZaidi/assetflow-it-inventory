@@ -17,53 +17,65 @@ class DashboardView extends StatelessWidget {
     final int retired = assets.where((a) => a.status == 'Retired').length;
 
     final double screenWidth = MediaQuery.of(context).size.width;
-    final int crossAxisCount = screenWidth > 1200 ? 4 : (screenWidth > 600 ? 2 : 1);
+    final int crossAxisCount =
+        screenWidth > 1200 ? 4 : (screenWidth > 600 ? 2 : 1);
 
     Widget logoWidget;
     if (provider.companyLogo.isNotEmpty) {
       try {
-        final cleanStr = provider.companyLogo.contains(',') 
-            ? provider.companyLogo.split(',')[1] 
+        final cleanStr = provider.companyLogo.contains(',')
+            ? provider.companyLogo.split(',')[1]
             : provider.companyLogo;
-        logoWidget = Image.memory(base64Decode(cleanStr), width: 48, height: 48, fit: BoxFit.contain);
+        logoWidget = Image.memory(base64Decode(cleanStr),
+            width: 48, height: 48, fit: BoxFit.contain);
       } catch (e) {
-        logoWidget = Image.asset('assets/images/default_logo.png', width: 48, height: 48, fit: BoxFit.contain);
+        logoWidget = Image.asset('assets/images/default_logo.png',
+            width: 48, height: 48, fit: BoxFit.contain);
       }
     } else {
-      logoWidget = Image.asset('assets/images/default_logo.png', width: 48, height: 48, fit: BoxFit.contain);
+      logoWidget = Image.asset('assets/images/default_logo.png',
+          width: 48, height: 48, fit: BoxFit.contain);
     }
 
-    final companyName = provider.companyName.isNotEmpty ? provider.companyName : 'AssetFlow Premium';
+    final companyName = provider.companyName.isNotEmpty
+        ? provider.companyName
+        : 'AssetFlow Premium';
     final companyAddress = provider.companyAddress;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
+        padding: EdgeInsets.all(screenWidth < 600 ? 16 : 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
+                Expanded(
+                    child: Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         color: Colors.white.withOpacity(0.05),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        border:
+                            Border.all(color: Colors.white.withOpacity(0.1)),
                       ),
                       child: logoWidget,
                     ),
                     const SizedBox(width: 16),
-                    Column(
+                    Expanded(
+                        child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           companyName,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 24),
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(fontSize: 24),
                         ),
                         if (companyAddress.isNotEmpty)
                           Text(
@@ -76,23 +88,27 @@ class DashboardView extends StatelessWidget {
                             style: Theme.of(context).textTheme.bodyMedium,
                           ),
                       ],
-                    ),
+                    )),
                   ],
-                ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      'Overview',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(fontSize: 28),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Welcome back. Here\'s your inventory status.',
-                      style: Theme.of(context).textTheme.bodyMedium,
-                    ),
-                  ],
-                )
+                )),
+                if (screenWidth >= 850)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        'Overview',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontSize: 28),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Welcome back. Here\'s your inventory status.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
+                  )
               ],
             ),
             const SizedBox(height: 32),

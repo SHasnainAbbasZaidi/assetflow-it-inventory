@@ -31,7 +31,7 @@ class _PersonnelViewState extends State<PersonnelView> {
           title: Text('Assets Assigned to ${person.fullName}'),
           content: SizedBox(
             width: 640,
-            child: wsList.isEmpty
+            child: wsList.isEmpty && person.peripherals.isEmpty
                 ? const Padding(
                     padding: EdgeInsets.symmetric(vertical: 24.0),
                     child: Text(
@@ -42,92 +42,101 @@ class _PersonnelViewState extends State<PersonnelView> {
                 : SingleChildScrollView(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
-                      children: wsList.map((ws) {
-                        final tag = ws['workstationTag'] ?? '';
-                        final deviceType = ws['deviceType'] ?? 'Workstation';
-                        final status = ws['status'] ?? 'IN_STORE';
-                        final peripherals = ws['peripherals'] is List
-                            ? ws['peripherals'] as List
-                            : [];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const Icon(Icons.computer_rounded,
-                                        size: 20, color: Color(0xFF6366F1)),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      tag,
-                                      style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontFamily: 'monospace',
-                                          fontSize: 15),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: _statusColor(status)
-                                            .withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(6),
+                      children: [
+                        ...wsList.map((ws) {
+                          final tag = ws['workstationTag'] ?? '';
+                          final deviceType = ws['deviceType'] ?? 'Workstation';
+                          final status = ws['status'] ?? 'IN_STORE';
+                          final peripherals = ws['peripherals'] is List
+                              ? ws['peripherals'] as List
+                              : [];
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(16.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.computer_rounded,
+                                          size: 20, color: Color(0xFF6366F1)),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        tag,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontFamily: 'monospace',
+                                            fontSize: 15),
                                       ),
-                                      child: Text(
-                                        _statusLabel(status),
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          color: _statusColor(status),
+                                      const SizedBox(width: 12),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: _statusColor(status)
+                                              .withOpacity(0.15),
+                                          borderRadius:
+                                              BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          _statusLabel(status),
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: _statusColor(status),
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                                if (deviceType.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text('Type: $deviceType',
-                                      style: const TextStyle(
-                                          color: Color(0xFF9CA3AF),
-                                          fontSize: 13)),
-                                ],
-                                if (peripherals.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  const Divider(height: 1),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    '${peripherals.length} Peripheral(s):',
-                                    style: const TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF818CF8)),
+                                    ],
                                   ),
-                                  const SizedBox(height: 4),
-                                  ...peripherals.map((per) {
-                                    final pMap = per is Map<String, dynamic>
-                                        ? per
-                                        : <String, dynamic>{};
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                          left: 16.0, bottom: 2),
-                                      child: Text(
-                                        '• ${pMap['peripheralTag'] ?? ''} — ${pMap['category'] ?? 'Peripheral'}',
+                                  if (deviceType.isNotEmpty) ...[
+                                    const SizedBox(height: 4),
+                                    Text('Type: $deviceType',
                                         style: const TextStyle(
-                                            fontSize: 12,
-                                            color: Color(0xFFD1D5DB)),
-                                      ),
-                                    );
-                                  }),
+                                            color: Color(0xFF9CA3AF),
+                                            fontSize: 13)),
+                                  ],
+                                  if (peripherals.isNotEmpty) ...[
+                                    const SizedBox(height: 8),
+                                    const Divider(height: 1),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      '${peripherals.length} Peripheral(s):',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF818CF8)),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ...peripherals.map((per) {
+                                      final pMap = per is Map<String, dynamic>
+                                          ? per
+                                          : <String, dynamic>{};
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                            left: 16.0, bottom: 2),
+                                        child: Text(
+                                          '• ${pMap['peripheralTag'] ?? ''} — ${pMap['category'] ?? 'Peripheral'}',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFFD1D5DB)),
+                                        ),
+                                      );
+                                    }),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      }).toList(),
+                          );
+                        }),
+                        ...person.peripherals.map((p) => Card(
+                            child: ListTile(
+                                leading: const Icon(Icons.mouse),
+                                title: Text(p['peripheralTag'] ?? ''),
+                                subtitle: Text(
+                                    '${p['category'] ?? 'Peripheral'} · Direct assignment · ${p['status']}'))))
+                      ],
                     ),
                   ),
           ),
@@ -250,8 +259,7 @@ class _PersonnelViewState extends State<PersonnelView> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.people_outline_rounded,
-                                size: 64,
-                                color: Colors.white.withOpacity(0.1)),
+                                size: 64, color: Colors.white.withOpacity(0.1)),
                             const SizedBox(height: 16),
                             const Text(
                               'No personnel found.',
@@ -291,8 +299,9 @@ class _PersonnelViewState extends State<PersonnelView> {
                                       children: [
                                         CircleAvatar(
                                           radius: 16,
-                                          backgroundColor: const Color(0xFF6366F1)
-                                              .withOpacity(0.2),
+                                          backgroundColor:
+                                              const Color(0xFF6366F1)
+                                                  .withOpacity(0.2),
                                           child: Text(
                                             person.fullName.isNotEmpty
                                                 ? person.fullName[0]
@@ -372,9 +381,8 @@ class _PersonnelViewState extends State<PersonnelView> {
                                             icon: const Icon(
                                                 Icons.edit_outlined,
                                                 size: 20),
-                                            onPressed: () =>
-                                                _openPersonnelForm(
-                                                    context, person),
+                                            onPressed: () => _openPersonnelForm(
+                                                context, person),
                                             tooltip: 'Edit',
                                           ),
                                           IconButton(
@@ -434,8 +442,7 @@ class _PersonnelViewState extends State<PersonnelView> {
     );
   }
 
-  Widget _summaryChip(
-      IconData icon, String count, String label, Color color) {
+  Widget _summaryChip(IconData icon, String count, String label, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
@@ -453,8 +460,7 @@ class _PersonnelViewState extends State<PersonnelView> {
                   fontWeight: FontWeight.bold, color: color, fontSize: 15)),
           const SizedBox(width: 4),
           Text(label,
-              style: TextStyle(
-                  color: color.withOpacity(0.7), fontSize: 12)),
+              style: TextStyle(color: color.withOpacity(0.7), fontSize: 12)),
         ],
       ),
     );
@@ -522,8 +528,7 @@ class _PersonnelFormDialogState extends State<PersonnelFormDialog> {
               TextFormField(
                 initialValue: _contactEmail,
                 decoration: const InputDecoration(
-                    labelText: 'Contact Email',
-                    hintText: 'john@company.com'),
+                    labelText: 'Contact Email', hintText: 'john@company.com'),
                 keyboardType: TextInputType.emailAddress,
                 onSaved: (v) => _contactEmail = v?.trim() ?? '',
               ),

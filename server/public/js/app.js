@@ -6,6 +6,7 @@ let currentUser = JSON.parse(localStorage.getItem('assetflow_user') || 'null');
 let currentTab = 'dashboard';
 let currentSettingsSubTab = 'company';
 let pendingCompanyLogo = null;
+let globalSearchRecords = null;
 const defaultAppFavicon = document.getElementById('appFavicon')?.getAttribute('href') || '';
 
 // In-memory data store
@@ -226,11 +227,14 @@ function setupEventListeners() {
     // Global Header Search
     const searchInput = document.getElementById('globalSearchInput');
     if (searchInput) {
+        let searchTimer;
+        searchInput.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer=setTimeout(()=>runGlobalSearch(searchInput.value),180); });
         searchInput.addEventListener('keydown', async (e) => {
             if (e.key === 'Enter') {
-                const tag = searchInput.value.trim();
-                if (tag) lookupAsset(tag);
+                clearTimeout(searchTimer);
+                runGlobalSearch(searchInput.value);
             }
+            if(e.key==='Escape') document.getElementById('globalSearchResults')?.remove();
         });
     }
 
@@ -250,6 +254,8 @@ function setupEventListeners() {
 
 // Tab Switching
 function switchTab(tab) {
+    document.body.classList.remove('navigation-open');
+    document.querySelector('.mobile-menu')?.setAttribute('aria-expanded','false');
     if (tab === 'settings' && currentUser?.role !== 'ADMIN') {
         showToast('Settings are restricted to Administrators.', 'error');
         return;
@@ -293,6 +299,7 @@ async function loadAllData() {
         data.personnel = results[2] || [];
         data.logs = results[3] || [];
         data.settings = results[4] || {};
+        globalSearchRecords = null;
         applySettingsToUI();
         data.customFields = results[5] || [];
         if (currentUser?.role === 'ADMIN') {
@@ -440,6 +447,7 @@ function renderWorkstations(container) {
             </div>
         </div>
 
+        ${TagStudio.toolbar()}
         <div class="glass-panel table-card">
             <div class="table-toolbar">
                 <div class="table-search">
@@ -488,7 +496,7 @@ function generateWorkstationsRows(workstations) {
         const assignedName = ws.personnel?.fullName || ws.userName;
         return `
         <tr>
-            <td><span class="tag-badge" style="color: #818cf8;">${escapeHtml(ws.workstationTag)}</span></td>
+            <td>${TagStudio.checkbox('workstation', ws.workstationTag)} <span class="tag-badge" style="color: #818cf8;">${escapeHtml(ws.workstationTag)}</span></td>
             <td>
                 ${assignedName 
                     ? `<a href="javascript:void(0)" onclick="openPersonnelOwnershipModal('${ws.personnelId || ''}')" style="color: #38bdf8; font-weight: 500; text-decoration: none;"><i class="ph ph-user" style="margin-right: 4px;"></i> ${escapeHtml(assignedName)}</a>` 
@@ -555,6 +563,7 @@ function renderPeripherals(container) {
             </div>
         </div>
 
+        ${TagStudio.toolbar()}
         <div class="glass-panel table-card">
             <div class="table-toolbar">
                 <div class="table-search">
@@ -606,10 +615,10 @@ function generatePeripheralsRows(peripherals) {
     }
     return peripherals.map(p => {
         const hostWs = p.workstation;
-        const assignedPerson = hostWs?.personnel?.fullName || hostWs?.userName;
+        const assignedPerson = p.personnel?.fullName || hostWs?.personnel?.fullName || hostWs?.userName;
         return `
         <tr>
-            <td><span class="tag-badge" style="color: #34d399;">${escapeHtml(p.peripheralTag)}</span></td>
+            <td>${TagStudio.checkbox('peripheral', p.peripheralTag)} <span class="tag-badge" style="color: #34d399;">${escapeHtml(p.peripheralTag)}</span></td>
             <td><span class="badge" style="background: rgba(99, 102, 241, 0.1); color: #a5b4fc;">${escapeHtml(p.category || 'Peripheral')}</span></td>
             <td>
                 <div style="font-weight: 500;">${escapeHtml(p.modelSpecs || 'N/A')}</div>
@@ -792,6 +801,7 @@ async function openPersonnelOwnershipModal(id) {
                 allPeripherals.push({ ...p, hostWorkstation: ws.workstationTag });
             });
         });
+        (person.peripherals || []).forEach(p => { if (!allPeripherals.some(item=>item.peripheralTag===p.peripheralTag)) allPeripherals.push({...p,hostWorkstation:'direct assignment'}); });
 
         let bodyHtml = `
             <div style="background: rgba(255,255,255,0.03); padding: 18px; border-radius: 12px; margin-bottom: 20px; border: 1px solid var(--border-subtle); display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; font-size: 13.5px;">
@@ -943,6 +953,9 @@ function renderSettings(container) {
         </div>
 
         <div class="settings-container">
+            <select class="mobile-settings-select select-filter" aria-label="Settings category" onchange="switchSettingsSubTab(this.value)">
+              ${[['company','Company Details & Logo'],['tags','Custom Tag Generator'],['tag-design','Tag Customizer'],['custom-fields','Custom Field Creator'],['users','Users & Access'],['themes','Themes & Personalization'],['mobile','Mobile APK Distribution']].map(([value,label])=>`<option value="${value}" ${currentSettingsSubTab===value?'selected':''}>${label}</option>`).join('')}
+            </select>
             <div class="settings-subnav">
                 <button class="subnav-btn ${currentSettingsSubTab === 'company' ? 'active' : ''}" onclick="switchSettingsSubTab('company')">
                     <i class="ph ph-buildings"></i> Company Details & Logo
@@ -972,10 +985,12 @@ function renderSettings(container) {
     `;
 
     renderSettingsSubPane();
+    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits">Developed by MAH Systems Inc.<br>Developer: Hasnain Zaidi</footer>');
 }
 
 function switchSettingsSubTab(subTab) {
     currentSettingsSubTab = subTab;
+    const compact=document.querySelector('.mobile-settings-select');if(compact)compact.value=subTab;
     document.querySelectorAll('.settings-subnav .subnav-btn').forEach(btn => {
         btn.classList.toggle('active', btn.getAttribute('onclick')?.includes(subTab));
     });
@@ -993,11 +1008,7 @@ function renderSettingsSubPane() {
         return;
     }
     if (currentSettingsSubTab === 'tag-design') {
-        const config = getTagConfig();
-        pane.innerHTML = `<div class="settings-pane"><h3>Tag Customizer</h3><p>Customize printed tags. Existing asset numbers remain unchanged.</p><form class="branding-fields" onsubmit="saveTagDesign(event)">
-          ${[['showCompany','Company logo, name and address'],['showDeviceName','Device details'],['showUser','Assigned user']].map(([key,label]) => `<label><input type="checkbox" id="${key}" ${config[key] ? 'checked' : ''}> ${label}</label>`).join('')}
-          <div class="form-group"><label for="tagQrSize">QR code size (50–120 px)</label><input id="tagQrSize" type="number" min="50" max="120" value="${config.qrSize}" required></div>
-          <button class="btn btn-primary" type="submit">Save Tag Design</button></form></div>`;
+        TagStudio.openEditor();
         return;
     }
 
@@ -1715,7 +1726,7 @@ async function lookupAsset(tag) {
                 `;
             }
         } else {
-            const hostPerson = asset.workstation?.personnel?.fullName || asset.workstation?.userName;
+            const hostPerson = asset.personnel?.fullName || asset.workstation?.personnel?.fullName || asset.workstation?.userName;
             bodyHtml += `
                 <div><strong>Category:</strong> ${escapeHtml(asset.category || 'N/A')}</div>
                 <div><strong>Brand / Manufacturer:</strong> ${escapeHtml(asset.brandManufacturer || 'N/A')}</div>
@@ -1943,93 +1954,28 @@ async function restoreAsset(kind, tag) {
 
 // Print Tag Helper
 function printTag(tag, type) {
-    const area = document.getElementById('printableTagArea');
-    const companyName = escapeHtml(data.settings.companyName || 'AssetFlow');
-    const companyAddress = escapeHtml(data.settings.companyAddress || '');
-    const companyLogo = getCompanyLogo();
-    const brandMark = companyLogo
-        ? `<img src="${companyLogo}" alt="${companyName} logo">`
-        : `<span class="tag-brand-fallback"><i class="ph ph-hexagon"></i></span>`;
-    const brandHeader = `
-        <div class="tag-brand-header">
-            <div class="tag-brand-mark">${brandMark}</div>
-            <div class="tag-brand-copy">
-                <strong>${companyName}</strong>
-                ${companyAddress ? `<span>${companyAddress}</span>` : ''}
-            </div>
-        </div>`;
-
-    if (type === 'workstation') {
-        const ws = data.workstations.find(w => w.workstationTag === tag);
-        if (!ws) return;
-        const assignedName = ws.personnel?.fullName || ws.userName || 'Unassigned';
-        
-        area.innerHTML = `
-            <div class="tag tag-large print-only-tag">
-                ${brandHeader}
-                <div class="tag-title">Device Details</div>
-                <div class="qr-box"><div id="printQrCode"></div></div>
-                <div class="field-row"><span class="field-label">Username:</span><span class="field-value">${escapeHtml(assignedName)}</span></div>
-                <div class="field-row"><span class="field-label">CPU:</span><span class="field-value">${escapeHtml(ws.processorGen || '')}</span></div>
-                <div class="field-row"><span class="field-label">Motherboard:</span><span class="field-value">${escapeHtml(ws.motherboard || '')}</span></div>
-                <div class="field-row"><span class="field-label">Storage:</span><span class="field-value">${escapeHtml(ws.ssd || ws.hdd || '')}</span></div>
-                <div class="field-row"><span class="field-label">RAM:</span><span class="field-value">${escapeHtml(ws.ram || '')}</span></div>
-                <div class="field-row"><span class="field-label">GPU:</span><span class="field-value">${escapeHtml(ws.gpu || '')}</span></div>
-                <div class="field-row" style="margin-top: 10px;"><span class="field-label" style="font-size: 11px;">Tag No:</span><span class="field-value" style="font-size: 11px; font-weight: bold; border: none;">${escapeHtml(tag)}</span></div>
-            </div>
-        `;
-    } else {
-        const p = data.peripherals.find(x => x.peripheralTag === tag);
-        if (!p) return;
-        const datePurchase = formatDate(p.purchaseDate);
-
-        area.innerHTML = `
-            <div class="tag tag-small print-only-tag">
-                ${brandHeader}
-                <div class="tag-title">Peripheral Tag</div>
-                <div class="qr-box"><div id="printQrCode"></div></div>
-                <div class="field-row field-row-small"><span class="field-label">Tag No:</span><span class="field-value" style="font-weight: bold;">${escapeHtml(p.category || 'Peripheral')} - ${escapeHtml(tag)}</span></div>
-                <div class="field-row field-row-small"><span class="field-label">Date Purchase:</span><span class="field-value">${escapeHtml(datePurchase)}</span></div>
-                ${p.brandManufacturer || p.modelSpecs ? `<div class="field-row field-row-small"><span class="field-label">Model/Brand:</span><span class="field-value" style="font-size:12px;">${escapeHtml(p.brandManufacturer || '')} ${escapeHtml(p.modelSpecs || '')}</span></div>` : ''}
-            </div>
-        `;
-    }
-
-    const qrContainer = document.getElementById('printQrCode');
-    const config = getTagConfig();
-    area.querySelector('.tag-brand-header').hidden = !config.showCompany;
-    if (!config.showUser && type === 'workstation') area.querySelector('.field-row').hidden = true;
-    if (!config.showDeviceName) {
-        area.querySelectorAll('.field-row').forEach(row => {
-            if (!/Tag No:|Username:/.test(row.textContent)) row.hidden = true;
-        });
-    }
-    const qrBox = area.querySelector('.qr-box');
-    qrBox.style.width = `${config.qrSize}px`;
-    qrBox.style.height = `${config.qrSize}px`;
-    area.querySelector('.print-only-tag').style.paddingRight = `${config.qrSize + 40}px`;
-    qrContainer.innerHTML = '';
-    if (window.QRCode) {
-        new QRCode(qrContainer, {
-            text: tag,
-            width: config.qrSize,
-            height: config.qrSize,
-            colorDark: "#000000",
-            colorLight: "#ffffff",
-            correctLevel: QRCode.CorrectLevel.L
-        });
-        // Make QRCode img styling fit the box
-        setTimeout(() => {
-            const img = qrContainer.querySelector('img');
-            if(img) {
-                img.style.width = '100%';
-                img.style.height = '100%';
-                img.style.margin = '0 auto';
-            }
-        }, 50);
-    }
-    openModal('tagPrintModal');
+    return TagStudio.printOne(tag, type);
 }
+
+function runGlobalSearch(query) {
+    document.getElementById('globalSearchResults')?.remove();
+    if (!query.trim()) return;
+    const company=data.settings.companyName || '';
+    const records=globalSearchRecords || [...data.workstations.map(a=>({tag:a.workstationTag,kind:'workstation',fields:{'Tag number':a.workstationTag,'Asset name':a.deviceType,'Asset type':'Workstation '+(a.deviceType||''),'Company':company}})),
+        ...data.peripherals.map(a=>({tag:a.peripheralTag,kind:'peripheral',fields:{'Tag number':a.peripheralTag,'Asset name':a.modelSpecs,'Asset type':'Peripheral '+(a.category||''),'Company':company}}))];
+    globalSearchRecords=records;
+    const results=TagLayout.search(records,query);
+    const panel=document.createElement('div'); panel.id='globalSearchResults';panel.setAttribute('aria-label','Search results');
+    const status=document.createElement('p');status.setAttribute('role','status');status.textContent=results.length?`${results.length===40?'First ':''}${results.length} matches`:'No matching assets';panel.append(status);
+    for(const r of results){const b=document.createElement('button');b.type='button';b.textContent=`${r.tag} · ${r.fields['Asset name']||r.kind} — matched ${r.matches.join(', ')}`;b.onclick=()=>{panel.remove();lookupAsset(r.tag);};panel.append(b);}
+    document.querySelector('.search-bar').append(panel);
+}
+
+function toggleMobileNavigation() {
+    const open=document.body.classList.toggle('navigation-open');
+    document.querySelector('.mobile-menu')?.setAttribute('aria-expanded',String(open));
+}
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){document.body.classList.remove('navigation-open');document.querySelector('.mobile-menu')?.setAttribute('aria-expanded','false');}});
 
 // Global Refresh Helper
 async function refreshData() {
