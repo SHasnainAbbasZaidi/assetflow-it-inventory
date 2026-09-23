@@ -102,9 +102,10 @@
         <main class="main-content">
             <!-- Top Header -->
             <header class="top-header">
+                <button class="icon-btn mobile-menu" aria-label="Open navigation" aria-expanded="false" onclick="toggleMobileNavigation()"><i class="ph ph-list"></i></button>
                 <div class="search-bar">
                     <i class="ph ph-magnifying-glass"></i>
-                    <input type="text" id="globalSearchInput" placeholder="Global Tag Lookup (e.g. WS-1001, PER-2001)...">
+                    <input type="search" id="globalSearchInput" aria-label="Search tags, names, types or company" placeholder="Search tags, names, types or company…" autocomplete="off">
                 </div>
                 <div class="header-actions">
                     <div class="user-badge">
@@ -450,18 +451,19 @@
 
     <!-- Printable Asset Tag Modal -->
     <div class="modal-overlay" id="tagPrintModal">
-        <div class="modal-content glass-panel" style="max-width: 480px;">
+        <div class="modal-content glass-panel">
             <div class="modal-header">
                 <h3>Asset Tag</h3>
                 <button class="icon-btn" onclick="closeModal('tagPrintModal')"><i class="ph ph-x"></i></button>
             </div>
             <div class="modal-body" style="align-items: center; justify-content: center; background: #e5e7eb; padding: 32px;">
                 <!-- The printable tag will be injected here by JS -->
-                <div id="printableTagArea"></div>
+                <iframe id="tagPrintFrame" title="A4 tag print preview"></iframe>
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal('tagPrintModal')">Close</button>
-                <button class="btn btn-primary" onclick="window.print()"><i class="ph ph-printer"></i> Print Tag</button>
+                <span class="muted">A4 · 100% scale · disable browser headers/footers</span>
+                <button class="btn btn-primary" onclick="TagStudio.print()"><i class="ph ph-printer"></i> Print Tags</button>
             </div>
         </div>
     </div>
@@ -470,5 +472,7 @@
     <div class="toast-container" id="toastContainer"></div>
 
     <script src="./js/app.js"></script>
+    <script src="./js/tag-layout.js"></script>
+    <script src="./js/tag-studio.js"></script>
 </body>
 </html>

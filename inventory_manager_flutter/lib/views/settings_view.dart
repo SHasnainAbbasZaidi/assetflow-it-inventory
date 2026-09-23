@@ -21,6 +21,7 @@ class _SettingsViewState extends State<SettingsView> {
   Uint8List? _logoBytes;
   final _geminiApiController = TextEditingController();
   final _companyNameController = TextEditingController();
+  int _category = 0;
   final _companyAddressController = TextEditingController();
   final _serverUrlController = TextEditingController();
   bool _isTestingServer = false;
@@ -114,7 +115,8 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _saveSettings(BuildContext context) async {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
     await provider.saveBrandingLogo(_currentLogoBase64);
-    await provider.saveCompanyDetails(_companyNameController.text.trim(), _companyAddressController.text.trim());
+    await provider.saveCompanyDetails(_companyNameController.text.trim(),
+        _companyAddressController.text.trim());
     await provider.saveGeminiApiKey(_geminiApiController.text.trim());
 
     ScaffoldMessenger.of(context).showSnackBar(
@@ -124,46 +126,65 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final labels = [
+      'Server connection',
+      'AI integrations',
+      'Company branding',
+      'Tag customizer',
+      'Custom fields',
+      'Users & access'
+    ];
+    final panels = [
+      _buildServerConfigCard(context),
+      _buildAIIntegrationsCard(context),
+      _buildBrandingCard(context),
+      _buildTagCustomizerCard(context),
+      _buildCustomFieldsManagerCard(context),
+      SizedBox(
+          height: 520,
+          child: AppUserManagementSection(
+              showHeader: true, onAddUser: () => _openAdminUserForm(context)))
+    ];
     return Scaffold(
       backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Settings',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleLarge
-                  ?.copyWith(fontSize: 28),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Configure branding and administrative users from one place.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 32),
-            _buildServerConfigCard(context),
-            const SizedBox(height: 28),
-            _buildAIIntegrationsCard(context),
-            const SizedBox(height: 28),
-            _buildBrandingCard(context),
-            const SizedBox(height: 28),
-            _buildTagCustomizerCard(context),
-            const SizedBox(height: 28),
-            _buildCustomFieldsManagerCard(context),
-            const SizedBox(height: 28),
+      body: LayoutBuilder(builder: (context, constraints) {
+        final compact = constraints.maxWidth < 850;
+        final content =
+            ListView(padding: EdgeInsets.all(compact ? 12 : 24), children: [
+          Text('Settings', style: Theme.of(context).textTheme.headlineSmall),
+          const SizedBox(height: 16),
+          if (compact)
+            Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: DropdownButtonFormField<int>(
+                    initialValue: _category,
+                    isExpanded: true,
+                    decoration:
+                        const InputDecoration(labelText: 'Settings category'),
+                    items: List.generate(
+                        labels.length,
+                        (i) =>
+                            DropdownMenuItem(value: i, child: Text(labels[i]))),
+                    onChanged: (i) => setState(() => _category = i ?? 0))),
+          panels[_category],
+          const SizedBox(height: 24),
+          const Text('Developed by MAH Systems Inc.\nDeveloper: Hasnain Zaidi',
+              style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+        ]);
+        return Row(children: [
+          if (!compact)
             SizedBox(
-              height: 520,
-              child: AppUserManagementSection(
-                showHeader: true,
-                onAddUser: () => _openAdminUserForm(context),
-              ),
-            ),
-          ],
-        ),
-      ),
+                width: 210,
+                child: ListView(
+                    children: List.generate(
+                        labels.length,
+                        (i) => ListTile(
+                            selected: _category == i,
+                            title: Text(labels[i]),
+                            onTap: () => setState(() => _category = i))))),
+          Expanded(child: content)
+        ]);
+      }),
     );
   }
 
@@ -179,11 +200,15 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.dns_rounded, color: Color(0xFF6366F1), size: 24),
+                    const Icon(Icons.dns_rounded,
+                        color: Color(0xFF6366F1), size: 24),
                     const SizedBox(width: 10),
                     Text(
                       'Server Configuration',
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 20),
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleMedium
+                          ?.copyWith(fontSize: 20),
                     ),
                   ],
                 ),
@@ -197,8 +222,10 @@ class _SettingsViewState extends State<SettingsView> {
                   controller: _serverUrlController,
                   decoration: const InputDecoration(
                     labelText: 'Server Base URL',
-                    hintText: 'e.g. http://192.168.1.100:3000 or https://myserver.com',
-                    helperText: 'Must include protocol (http:// or https://) and port if applicable.',
+                    hintText:
+                        'e.g. http://192.168.1.100:3000 or https://myserver.com',
+                    helperText:
+                        'Must include protocol (http:// or https://) and port if applicable.',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -218,7 +245,9 @@ class _SettingsViewState extends State<SettingsView> {
                               if (context.mounted) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   SnackBar(
-                                    backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFF43F5E),
+                                    backgroundColor: ok
+                                        ? const Color(0xFF10B981)
+                                        : const Color(0xFFF43F5E),
                                     content: Text(ok
                                         ? 'Server connection successful! ($url)'
                                         : 'Failed to connect to server at $url. Check URL and server status.'),
@@ -227,18 +256,25 @@ class _SettingsViewState extends State<SettingsView> {
                               }
                             },
                       icon: _isTestingServer
-                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.network_check_rounded, size: 18),
                       label: const Text('Test Connection'),
                     ),
                     const SizedBox(width: 12),
                     ElevatedButton.icon(
                       onPressed: () async {
-                        final auth = Provider.of<AuthProvider>(context, listen: false);
-                        await auth.setServerUrl(_serverUrlController.text.trim());
+                        final auth =
+                            Provider.of<AuthProvider>(context, listen: false);
+                        await auth
+                            .setServerUrl(_serverUrlController.text.trim());
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Server URL updated successfully!')),
+                            const SnackBar(
+                                content:
+                                    Text('Server URL updated successfully!')),
                           );
                         }
                       },
@@ -267,7 +303,10 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 Text(
                   'AI Integrations',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 20),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontSize: 20),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -281,7 +320,8 @@ class _SettingsViewState extends State<SettingsView> {
                   decoration: const InputDecoration(
                     labelText: 'Gemini API Key',
                     hintText: 'Paste your API key here (AIzaSy...)',
-                    helperText: 'Required for "Scan Item with Camera" feature in Tag Generator.',
+                    helperText:
+                        'Required for "Scan Item with Camera" feature in Tag Generator.',
                     border: OutlineInputBorder(),
                   ),
                 ),
@@ -456,7 +496,10 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 Text(
                   'Tag Customizer',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 20),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontSize: 20),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -497,19 +540,23 @@ class _SettingsViewState extends State<SettingsView> {
                           },
                         ),
                         Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16.0, vertical: 8.0),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              const Text('QR Code Size', style: TextStyle(fontSize: 16)),
+                              const Text('QR Code Size',
+                                  style: TextStyle(fontSize: 16)),
                               Slider(
                                 value: (config['qrSize'] ?? 100.0).toDouble(),
                                 min: 50.0,
                                 max: 150.0,
                                 divisions: 10,
-                                label: '${(config['qrSize'] ?? 100.0).toInt()}%',
+                                label:
+                                    '${(config['qrSize'] ?? 100.0).toInt()}%',
                                 onChanged: (val) {
-                                  final newConfig = Map<String, dynamic>.from(config);
+                                  final newConfig =
+                                      Map<String, dynamic>.from(config);
                                   newConfig['qrSize'] = val;
                                   provider.saveTagConfig(newConfig);
                                 },
@@ -541,7 +588,10 @@ class _SettingsViewState extends State<SettingsView> {
               children: [
                 Text(
                   'Custom Fields Manager',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontSize: 20),
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontSize: 20),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -557,7 +607,8 @@ class _SettingsViewState extends State<SettingsView> {
                         if (fields.isEmpty)
                           const Padding(
                             padding: EdgeInsets.all(16.0),
-                            child: Text('No custom fields defined.', style: TextStyle(color: Colors.grey)),
+                            child: Text('No custom fields defined.',
+                                style: TextStyle(color: Colors.grey)),
                           )
                         else
                           ListView.builder(
@@ -568,11 +619,14 @@ class _SettingsViewState extends State<SettingsView> {
                               final field = fields[index];
                               return ListTile(
                                 title: Text(field['name'] ?? ''),
-                                subtitle: Text('Target: ${field['target']} | ID: ${field['id']}'),
+                                subtitle: Text(
+                                    'Target: ${field['target']} | ID: ${field['id']}'),
                                 trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: const Icon(Icons.delete,
+                                      color: Colors.red),
                                   onPressed: () {
-                                    final newFields = List<Map<String, dynamic>>.from(fields);
+                                    final newFields =
+                                        List<Map<String, dynamic>>.from(fields);
                                     newFields.removeAt(index);
                                     provider.saveCustomFieldsConfig(newFields);
                                   },
@@ -582,7 +636,8 @@ class _SettingsViewState extends State<SettingsView> {
                           ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          onPressed: () => _showAddCustomFieldDialog(context, provider),
+                          onPressed: () =>
+                              _showAddCustomFieldDialog(context, provider),
                           icon: const Icon(Icons.add),
                           label: const Text('Add Custom Field'),
                         ),
@@ -598,7 +653,8 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  void _showAddCustomFieldDialog(BuildContext context, InventoryProvider provider) {
+  void _showAddCustomFieldDialog(
+      BuildContext context, InventoryProvider provider) {
     final _formKey = GlobalKey<FormState>();
     String _name = '';
     String _target = 'Workstation';
@@ -613,8 +669,10 @@ class _SettingsViewState extends State<SettingsView> {
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
-                decoration: const InputDecoration(labelText: 'Field Name (e.g. Warranty Provider)'),
-                validator: (val) => val == null || val.trim().isEmpty ? 'Required' : null,
+                decoration: const InputDecoration(
+                    labelText: 'Field Name (e.g. Warranty Provider)'),
+                validator: (val) =>
+                    val == null || val.trim().isEmpty ? 'Required' : null,
                 onSaved: (val) => _name = val!.trim(),
               ),
               const SizedBox(height: 16),
@@ -622,8 +680,10 @@ class _SettingsViewState extends State<SettingsView> {
                 value: _target,
                 decoration: const InputDecoration(labelText: 'Target Category'),
                 items: const [
-                  DropdownMenuItem(value: 'Workstation', child: Text('Workstation')),
-                  DropdownMenuItem(value: 'Peripheral', child: Text('Peripheral')),
+                  DropdownMenuItem(
+                      value: 'Workstation', child: Text('Workstation')),
+                  DropdownMenuItem(
+                      value: 'Peripheral', child: Text('Peripheral')),
                 ],
                 onChanged: (val) => _target = val!,
                 onSaved: (val) => _target = val!,
@@ -632,13 +692,17 @@ class _SettingsViewState extends State<SettingsView> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               if (_formKey.currentState!.validate()) {
                 _formKey.currentState!.save();
-                final id = _name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
-                final newFields = List<Map<String, dynamic>>.from(provider.customFieldsConfig);
+                final id =
+                    _name.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '_');
+                final newFields = List<Map<String, dynamic>>.from(
+                    provider.customFieldsConfig);
                 newFields.add({
                   'id': id,
                   'name': _name,

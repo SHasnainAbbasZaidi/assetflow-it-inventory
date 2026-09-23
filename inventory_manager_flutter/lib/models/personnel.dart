@@ -10,6 +10,7 @@ class Personnel {
   final int peripheralsCount;
   final int totalAssetsCount;
   final List<Map<String, dynamic>> workstations;
+  final List<Map<String, dynamic>> peripherals;
 
   Personnel({
     required this.id,
@@ -21,6 +22,7 @@ class Personnel {
     this.peripheralsCount = 0,
     this.totalAssetsCount = 0,
     this.workstations = const [],
+    this.peripherals = const [],
   });
 
   factory Personnel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,9 @@ class Personnel {
       peripheralsCount: json['peripheralsCount'] ?? 0,
       totalAssetsCount: json['totalAssetsCount'] ?? wsList.length,
       workstations: wsList,
+      peripherals: json['peripherals'] is List
+          ? (json['peripherals'] as List).cast<Map<String, dynamic>>()
+          : [],
     );
   }
 

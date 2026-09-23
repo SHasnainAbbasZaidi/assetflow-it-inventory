@@ -13,6 +13,7 @@ import { prisma } from './prisma.js';
 import { AssetStatus, exportWorkbook, importWorkbook } from './services/excel-service.js';
 import { errorHandler, httpError, notFound } from './middleware/errors.js';
 import { seedAndMigrateData } from '../prisma/seed.js';
+import { assignAsset, assignmentState } from './services/assignment-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -192,6 +193,7 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
 app.get('/api/personnel', requireAuth, async (req, res) => {
   const personnelList = await prisma.personnel.findMany({
     include: {
+      peripherals: true,
       workstations: {
         include: {
           peripherals: true,
@@ -204,7 +206,7 @@ app.get('/api/personnel', requireAuth, async (req, res) => {
   // Attach aggregated counts
   const enriched = personnelList.map(person => {
     const wsList = person.workstations || [];
-    let perCount = 0;
+    let perCount = (person.peripherals || []).length;
     wsList.forEach(ws => {
       perCount += (ws.peripherals || []).length;
     });
@@ -223,6 +225,7 @@ app.get('/api/personnel/:id', requireAuth, async (req, res) => {
   const person = await prisma.personnel.findUnique({
     where: { id: req.params.id },
     include: {
+      peripherals: true,
       workstations: {
         include: {
           peripherals: true,
@@ -287,6 +290,7 @@ app.delete('/api/personnel/:id', requireAuth, requireRole(['ADMIN']), async (req
       where: { personnelId: req.params.id },
       data: { personnelId: null, userName: null }
     });
+    await tx.peripheral.updateMany({where:{personnelId:req.params.id,status:'ASSIGNED'},data:{personnelId:null,status:'IN_STORE'}});
     await tx.personnel.delete({ where: { id: req.params.id } });
     await audit(tx, req.auth.email, null, `Deleted Personnel record: ${person.fullName}`);
   });
@@ -296,19 +300,23 @@ app.delete('/api/personnel/:id', requireAuth, requireRole(['ADMIN']), async (req
 // =====================================================================
 // GLOBAL ASSET LOOKUP
 // =====================================================================
+app.post('/api/assets/:kind/:tag/assign', requireAuth, requireRole(['ADMIN','EDITOR']), async (req,res) => {
+  res.json(await assignAsset(prisma,req.params.kind,req.params.tag,req.body,req.auth.email));
+});
+
 app.get('/api/assets/lookup/:tag', requireAuth, async (req, res) => {
   const tag = req.params.tag.trim();
   const workstation = await prisma.workstation.findUnique({
     where: { workstationTag: tag },
     include: { peripherals: true, personnel: true }
   });
-  if (workstation) return res.json({ type: 'workstation', data: workstation });
+  if (workstation) return res.json({ type: 'workstation', data: {...workstation, assignmentState:assignmentState(workstation)} });
 
   const peripheral = await prisma.peripheral.findUnique({
     where: { peripheralTag: tag },
-    include: { workstation: { include: { personnel: true } } }
+    include: { personnel:true, workstation: { include: { personnel: true } } }
   });
-  if (peripheral) return res.json({ type: 'peripheral', data: peripheral });
+  if (peripheral) return res.json({ type: 'peripheral', data: {...peripheral, assignmentState:assignmentState(peripheral)} });
 
   throw httpError(404, `No workstation or peripheral found for tag "${tag}".`, 'ASSET_NOT_FOUND');
 });
@@ -320,7 +328,7 @@ app.get('/api/sync', requireAuth, async (req, res) => {
   const since = req.query.since ? new Date(req.query.since) : null;
   const [workstations, peripherals, personnel, users, settings, logs] = await Promise.all([
     prisma.workstation.findMany({ include: { peripherals: true, personnel: true } }),
-    prisma.peripheral.findMany({ include: { workstation: true } }),
+    prisma.peripheral.findMany({ include: { personnel:true, workstation: true } }),
     prisma.personnel.findMany({ include: { workstations: true } }),
     prisma.appUser.findMany({ select: { email: true, fullName: true, role: true, status: true, createdAt: true } }),
     prisma.appSetting.findMany(),
@@ -432,7 +440,7 @@ app.patch('/api/workstations/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR']
 // =====================================================================
 app.get('/api/peripherals', requireAuth, async (req, res) => {
   const peripherals = await prisma.peripheral.findMany({
-    include: { workstation: { include: { personnel: true } } },
+    include: { personnel:true, workstation: { include: { personnel: true } } },
     orderBy: { peripheralTag: 'asc' },
   });
   res.json(peripherals);
@@ -469,6 +477,7 @@ app.patch('/api/peripherals/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR'])
   }
   const updateData = { ...fields };
   if (fields.workstationTag !== undefined) updateData.workstationTag = fields.workstationTag || null;
+  if (fields.workstationTag) updateData.personnelId = null;
   if (customFields !== undefined) updateData.customFields = serializeCustomFields(customFields);
 
   const asset = await prisma.$transaction(async tx => {
@@ -723,6 +732,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(err => {
+export { app };
+if (process.env.NODE_ENV !== 'test') startServer().catch(err => {
   console.error('Failed to start AssetFlow:', err);
 });
