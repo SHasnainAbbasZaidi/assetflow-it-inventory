@@ -23,7 +23,7 @@
   "devDependencies": {
     "prisma": "^6.6.0"
   },
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "AssetFlow by Mahzaidex Tech",
   "author": "Hasnain Zaidi"
 }

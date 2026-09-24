@@ -12,14 +12,8 @@ Add-Type -AssemblyName System.Drawing
 if ($LogoPath) {
     $imageBytes = [IO.File]::ReadAllBytes((Resolve-Path -LiteralPath $LogoPath))
 } else {
-    $branding = Invoke-RestMethod "$($ServerUrl.TrimEnd('/'))/api/branding"
-    if ($branding.companyLogo -match '^data:image/(png|jpeg|gif);base64,(.+)$') {
-        $imageBytes = [Convert]::FromBase64String($Matches[2])
-    } elseif (Test-Path -LiteralPath $savedLogo) {
-        $imageBytes = [IO.File]::ReadAllBytes($savedLogo)
-    } else {
-        throw 'Save the uploaded application logo in Settings, or pass -LogoPath. No default icon will be substituted.'
-    }
+    # The QR application icon is the default; branding uploads do not override it.
+    $imageBytes = [IO.File]::ReadAllBytes((Join-Path $mobileRoot 'assets/images/default_logo.png'))
 }
 $stream = [IO.MemoryStream]::new($imageBytes)
 $sourceImage = [Drawing.Image]::FromStream($stream)

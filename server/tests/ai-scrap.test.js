@@ -12,6 +12,8 @@ import {createVault,aiRoutes,privateSetting} from '../src/services/ai-service.js
 import {adminTools} from '../src/services/admin-tools.js';
 import {createBackupService,snapshot,stateWorkbook} from '../src/services/backup-service.js';
 import {errorHandler} from '../src/middleware/errors.js';
+import {importWorkbook,SHEETS} from '../src/services/excel-service.js';
+import {reconcileScrapped} from '../src/services/scrap-service.js';
 
 test('encrypted personal AI keys stay private; scrap reports preserve facts and commit once',async()=>{
  const root=await fs.mkdtemp(path.join(os.tmpdir(),'assetflow-ai-scrap-')),file=path.join(root,'test.db');
@@ -48,6 +50,13 @@ test('encrypted personal AI keys stay private; scrap reports preserve facts and 
   assert.equal((await send('/admin/scrap',body)).status,200);assert.equal(await prisma.auditLog.count(),2);assert.equal((await prisma.workstation.findUnique({where:{workstationTag:'WS-1'}})).status,'SCRAPPED');assert.equal((await prisma.peripheral.findUnique({where:{peripheralTag:'PER-1'}})).workstationTag,null);
   assert.equal((await send('/admin/scrap/preview',{tags:'PER-1'})).status,409);
   const reportBook=new ExcelJS.Workbook();await reportBook.xlsx.load(Buffer.from(await (await send('/admin/scrap/'+report.id+'?format=xlsx',null,'GET')).arrayBuffer()));assert.equal(reportBook.worksheets[0].getCell('C3').value,'admin@test');assert.equal(reportBook.worksheets[0].rowCount,7);
+  const imported=new ExcelJS.Workbook();for(const [name,headers] of Object.entries(SHEETS))imported.addWorksheet(name).addRow(headers);
+  imported.getWorksheet('Peripherals').addRow(['IMPORT-SCRAP','SSD','1 TB','','Scrapped','2025-01-01','','Demo',1,'1 TB','']);
+  const resultImport=await importWorkbook(await imported.xlsx.writeBuffer(),prisma,{name:'Import operator',email:'admin@test',role:'ADMIN'});assert.equal(resultImport.inserted,1);
+  const register=await prisma.appSetting.findMany({where:{key:{startsWith:'__scrap-report:'}}});
+  const importedReport=register.map(r=>JSON.parse(r.value)).find(r=>r.tags.includes('IMPORT-SCRAP'));assert.equal(importedReport.operator.name,'Import operator');assert.ok(importedReport.rows[0].scrapDate);assert.equal(importedReport.rows[0].details.modelSpecs,'1 TB');
+  await prisma.peripheral.create({data:{peripheralTag:'LEGACY-SCRAP',status:'SCRAPPED',category:'RAM'}});
+  await reconcileScrapped(prisma);const count=await prisma.appSetting.count({where:{key:{startsWith:'__scrap-report:'}}});await reconcileScrapped(prisma);assert.equal(await prisma.appSetting.count({where:{key:{startsWith:'__scrap-report:'}}}),count);
   assert.equal((await send('/ai/keys/openai',null,'DELETE')).status,204);assert.equal(await prisma.appSetting.count({where:{key:{startsWith:'__ai:'}}}),0);
  }finally{if(server)await new Promise(r=>server.close(r));await prisma.$disconnect();await fs.rm(root,{recursive:true,force:true});}
 });

@@ -17,113 +17,47 @@ class TagPdfService {
   }) async {
     final pdf = pw.Document();
     final logo = await _decodeLogo(companyLogo);
-    bool isWorkstation(AssetTag tag) => [
-          'workstation',
-          'computer',
-          'desktop',
-          'laptop',
-          'pc'
-        ].contains(tag.itemCategory.toLowerCase());
+    bool isWorkstation(AssetTag tag) => const ['workstation','computer','desktop','laptop','pc','motherboard','mini pc','all-in-one pc','assembled pc'].contains(tag.itemCategory.toLowerCase());
     for (final workstation in [true, false]) {
-      final group =
-          tags.where((tag) => isWorkstation(tag) == workstation).toList();
-      final perPage = workstation ? 4 : 8;
-      final height = workstation ? 131.09 : 65.54;
+      final group = tags.where((tag) => isWorkstation(tag) == workstation).toList();
+      final perPage = workstation ? 8 : 16;
       for (var offset = 0; offset < group.length; offset += perPage) {
         final chunk = group.skip(offset).take(perPage).toList();
-        pdf.addPage(pw.Page(
-          pageFormat: PdfPageFormat.a4,
-          margin: pw.EdgeInsets.all(10 * PdfPageFormat.mm),
-          build: (_) => pw.Column(children: [
-            for (var row = 0; row < chunk.length; row += 2)
-              pw.Padding(
-                  padding: pw.EdgeInsets.only(bottom: 4 * PdfPageFormat.mm),
-                  child: pw.Row(children: [
-                    for (var col = 0;
-                        col < 2 && row + col < chunk.length;
-                        col++) ...[
-                      if (col > 0) pw.SizedBox(width: 4 * PdfPageFormat.mm),
-                      pw.Container(
-                        width: 93 * PdfPageFormat.mm,
-                        height: height * PdfPageFormat.mm,
-                        padding: pw.EdgeInsets.all(5 * PdfPageFormat.mm),
-                        decoration: pw.BoxDecoration(
-                            border: pw.Border.all(color: PdfColors.grey300)),
-                        child: pw.FittedBox(
-                            fit: pw.BoxFit.scaleDown,
-                            alignment: pw.Alignment.topLeft,
-                            child: pw.SizedBox(
-                              width: 83 * PdfPageFormat.mm,
-                              child: pw.Column(
-                                  crossAxisAlignment:
-                                      pw.CrossAxisAlignment.start,
-                                  children: [
-                                    if (config['showCompany'] != false) ...[
-                                      if (logo != null)
-                                        pw.Image(logo,
-                                            width: 35,
-                                            height: 25,
-                                            fit: pw.BoxFit.contain),
-                                      pw.Text(companyName,
-                                          style: pw.TextStyle(
-                                              fontWeight: pw.FontWeight.bold,
-                                              fontSize: 12)),
-                                      pw.SizedBox(height: 8),
-                                    ],
-                                    pw.Text(chunk[row + col].tagNumber,
-                                        style: pw.TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: pw.FontWeight.bold)),
-                                    pw.SizedBox(height: 8),
-                                    pw.Row(
-                                        crossAxisAlignment:
-                                            pw.CrossAxisAlignment.start,
-                                        children: [
-                                          pw.Expanded(
-                                              child: pw.Column(
-                                                  crossAxisAlignment: pw
-                                                      .CrossAxisAlignment.start,
-                                                  children: [
-                                                if (config['showDeviceName'] !=
-                                                    false)
-                                                  pw.Text(
-                                                      '${chunk[row + col].deviceType} ${chunk[row + col].modelName}',
-                                                      style: const pw.TextStyle(
-                                                          fontSize: 10)),
-                                                if (config['showUser'] != false)
-                                                  pw.Text(
-                                                      'User: ${chunk[row + col].username}',
-                                                      style: const pw.TextStyle(
-                                                          fontSize: 10)),
-                                                if (workstation) ...[
-                                                  pw.Text(
-                                                      'CPU: ${chunk[row + col].cpu}'),
-                                                  pw.Text(
-                                                      'RAM: ${chunk[row + col].ram}'),
-                                                  pw.Text(
-                                                      'Storage: ${chunk[row + col].storage}'),
-                                                ] else
-                                                  pw.Text(
-                                                      'Purchased: ${chunk[row + col].purchaseDate}'),
-                                              ])),
-                                          pw.SizedBox(width: 8),
-                                          pw.BarcodeWidget(
-                                              barcode: pw.Barcode.qrCode(),
-                                              data: chunk[row + col].tagNumber,
-                                              width: 65,
-                                              height: 65),
-                                        ]),
-                                  ]),
-                            )),
-                      ),
-                    ],
-                  ])),
-          ]),
-        ));
+        pw.Widget label(AssetTag tag) {
+          final fields = ['CPU: ${tag.cpu}', 'Motherboard: ${tag.motherboard}', 'RAM: ${tag.ram}', 'Storage: ${tag.storage}', 'GPU: ${tag.gpu}'];
+          // Refuse unreadably dense labels; no whole-label shrinking or clipped text.
+          if (tag.tagNumber.length > 66 || tag.username.length > 66 || (workstation && fields.fold<int>(0, (n,v) => n + (v.length /  fiftyChars).ceil()) > 8)) {
+            throw FormatException('Tag ${tag.tagNumber} has too much text for a compact label. Use the web Tag Customizer to print a larger label.');
+          }
+          return pw.Container(width: 93*PdfPageFormat.mm, height:(workstation?65:30)*PdfPageFormat.mm,
+            decoration: pw.BoxDecoration(border:pw.Border.all(color:PdfColors.grey400),borderRadius:pw.BorderRadius.circular(3)),
+            padding:pw.EdgeInsets.all(3*PdfPageFormat.mm),
+            child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+              pw.Row(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+                pw.Expanded(child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
+                  pw.Text(workstation?'Device Details':'Peripheral Tag',style:pw.TextStyle(fontSize:10,fontWeight:pw.FontWeight.bold,color:PdfColors.blue700)),
+                  pw.SizedBox(height:5),
+                  pw.Text('Tag No: ${tag.tagNumber}',style:const pw.TextStyle(fontSize:8)),
+                  pw.SizedBox(height:5),
+                  pw.Text(workstation?'Username: ${tag.username}':'Date Purchase: ${tag.purchaseDate}',style:const pw.TextStyle(fontSize:8)),
+                ])),
+                pw.SizedBox(width:3*PdfPageFormat.mm),
+                pw.Container(color:PdfColors.white,padding:const pw.EdgeInsets.all(2),child:pw.Stack(alignment:pw.Alignment.center,children:[
+                  pw.BarcodeWidget(barcode:pw.Barcode.qrCode(errorCorrectLevel:pw.BarcodeQRCorrectionLevel.high),data:tag.tagNumber,width:20*PdfPageFormat.mm,height:20*PdfPageFormat.mm),
+                  if(logo!=null) pw.Container(color:PdfColors.white,padding:const pw.EdgeInsets.all(1),child:pw.Image(logo,width:9,height:9)),
+                ])),
+              ]),
+              if(workstation) ...[pw.SizedBox(height:6),for(final field in fields) pw.Padding(padding:const pw.EdgeInsets.only(bottom:3),child:pw.Text(field,style:const pw.TextStyle(fontSize:8)))],
+            ]));
+        }
+        pdf.addPage(pw.Page(pageFormat:PdfPageFormat.a4,margin:pw.EdgeInsets.all(10*PdfPageFormat.mm),build:(_)=>pw.Column(children:[
+          for(var row=0;row<chunk.length;row+=2) pw.Padding(padding:pw.EdgeInsets.only(bottom:row+2<chunk.length?4*PdfPageFormat.mm:0),child:pw.Row(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[label(chunk[row]),if(row+1<chunk.length)...[pw.SizedBox(width:4*PdfPageFormat.mm),label(chunk[row+1])]])),
+        ])));
       }
     }
     return pdf.save();
   }
+  static const fiftyChars = 50;
 
   static Future<Uint8List> buildTagsPdf({
     required InventoryProvider provider,

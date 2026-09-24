@@ -428,7 +428,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
 
     // Core fields
-    final coreFields = AssetCategorySchemas.schemas[widget.category] ?? [];
+    final coreFields = AssetCategorySchemas.fieldsFor(widget.category);
     for (final field in coreFields) {
       final id = field['id']!;
       final val = _customFields[id]?.toString() ?? '';
@@ -455,7 +455,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     final provider = Provider.of<InventoryProvider>(context);
     final isEdit = widget.asset != null;
 
-    final coreFields = AssetCategorySchemas.schemas[widget.category] ?? [];
+    final coreFields = AssetCategorySchemas.fieldsFor(widget.category);
     final dynamicFields = provider.customFieldsConfig.where((f) => f['target'] == widget.category).toList();
 
     return AlertDialog(

@@ -10,6 +10,17 @@ import 'package:inventory_manager_flutter/models/activity_log.dart';
 import 'package:inventory_manager_flutter/services/asset_api_service.dart';
 
 class InventoryProvider extends ChangeNotifier {
+  static Map<String, dynamic> editableAssetFields(Map raw, Map<String, dynamic> aliases) {
+    final encoded = raw['customFields'] ?? raw['custom_fields'];
+    Map<String, dynamic> saved = {};
+    try {
+      final decoded = encoded is String ? jsonDecode(encoded) : encoded;
+      if (decoded is Map) saved = Map<String, dynamic>.from(decoded);
+    } catch (_) { /* Preserve valid server fields if legacy custom JSON is malformed. */ }
+    final fields = <String, dynamic>{...saved, ...Map<String, dynamic>.from(raw), ...aliases};
+    for(final key in ['customFields','custom_fields','personnel','peripherals','workstation']) { fields.remove(key); }
+    return fields;
+  }
   late Box _settingsBox;
 
   List<Asset> _workstations = [];
@@ -161,7 +172,7 @@ class InventoryProvider extends ChangeNotifier {
         serial: '',
         status: _mapStatus(w['status'] ?? ''),
         assignee: w['userName'] ?? '',
-        customFields: w['custom_fields'] ?? w,
+        customFields: editableAssetFields(w, {'cpu':w['processorGen'], 'storage':w['ssd']}),
         dateAdded: w['assignedDate']?.toString().split('T')[0] ?? '',
       ));
       _tags.add(AssetTag(
@@ -169,8 +180,8 @@ class InventoryProvider extends ChangeNotifier {
         deviceType: w['deviceType'] ?? 'Workstation', itemCategory: 'Workstation',
         modelName: tag, quantity: 1, vendorName: '', requestedBy: '', purchaseCost: '',
         warrantyExpiry: '', department: '', notes: w['notes'] ?? '', createdAt: '',
-        username: w['userName'] ?? '', cpu: w['processorGen'] ?? '', motherboard: w['motherboard'] ?? '',
-        storage: w['ssd'] ?? '', ram: w['ram'] ?? '', gpu: w['gpu'] ?? ''
+        username: w['personnel']?['fullName'] ?? w['userName'] ?? '', cpu: w['processorGen'] ?? '', motherboard: w['motherboard'] ?? '',
+        storage: [w['ssd'],w['hdd']].where((v)=>v!=null && v.toString().isNotEmpty).join(' / '), ram: w['ram'] ?? '', gpu: w['gpu'] ?? ''
       ));
     }
 
@@ -183,7 +194,7 @@ class InventoryProvider extends ChangeNotifier {
         serial: '',
         status: _mapStatus(p['status'] ?? ''),
         assignee: p['workstationTag'] ?? '',
-        customFields: p['custom_fields'] ?? p,
+        customFields: editableAssetFields(p, {'model':p['modelSpecs'], 'deviceType':p['brandManufacturer'], 'storage':p['storageCapacity'], 'gpu':p['gpuSpecs']}),
         dateAdded: p['purchaseDate']?.toString().split('T')[0] ?? '',
       ));
       _tags.add(AssetTag(
@@ -253,7 +264,7 @@ class InventoryProvider extends ChangeNotifier {
         'ssd': customFields['storage'],
         'gpu': customFields['gpu'],
         'notes': customFields['notes'],
-        'custom_fields': customFields,
+        'customFields': customFields,
       });
     } else {
       await api.createPeripheral({
@@ -265,7 +276,7 @@ class InventoryProvider extends ChangeNotifier {
         'storageCapacity': customFields['storage'],
         'gpuSpecs': customFields['gpu'],
         'quantity': 1,
-        'custom_fields': customFields,
+        'customFields': customFields,
       });
     }
     await syncWithServer(_token!);
@@ -297,7 +308,7 @@ class InventoryProvider extends ChangeNotifier {
         'ssd': customFields['storage'],
         'gpu': customFields['gpu'],
         'notes': customFields['notes'],
-        'custom_fields': customFields,
+        'customFields': customFields,
       });
     } else {
       await api.updatePeripheral(id, {
@@ -307,7 +318,7 @@ class InventoryProvider extends ChangeNotifier {
         'brandManufacturer': customFields['deviceType'],
         'storageCapacity': customFields['storage'],
         'gpuSpecs': customFields['gpu'],
-        'custom_fields': customFields,
+        'customFields': customFields,
       });
     }
     await syncWithServer(_token!);

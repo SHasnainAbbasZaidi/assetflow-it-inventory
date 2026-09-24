@@ -138,7 +138,8 @@ class _ScrapReportViewState extends State<ScrapReportView> {
                     'Status',
                     'Previous owner',
                     'Qty',
-                    'Details'
+                    'Details',
+                    'Scrap date'
                   ],
                   data: (value['rows'] as List)
                       .map((r) => [
@@ -149,7 +150,8 @@ class _ScrapReportViewState extends State<ScrapReportView> {
                             r['status'],
                             r['person'],
                             r['quantity'].toString(),
-                            jsonEncode(r['details'])
+                            jsonEncode(r['details']),
+                            r['scrapDate'] ?? value['date']
                           ])
                       .toList(),
                   cellStyle: const pw.TextStyle(fontSize: 7),

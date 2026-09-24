@@ -7,12 +7,13 @@ const TagStudio = (() => {
     const esc = value => escapeHtml(String(value ?? ''));
     const number = (value, fallback=0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
     const color = (value, fallback='#111827') => /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
-    const fields = ['companyName','companyAddress','tag','device','person','specs','status','purchaseDate'];
+    const fields = ['companyName','companyAddress','tag','device','person','specs','status','purchaseDate','tagLabel','purchaseLabel','personLabel'];
     function load() {
         try { templates = JSON.parse(data.settings.tagTemplates || 'null'); } catch (_) { templates = null; }
         if (!Array.isArray(templates) || !templates.length) templates = ['workstation','peripheral'].map(TagLayout.defaults);
         templates = templates.filter(t => t && Array.isArray(t.elements) && t.width > 0 && t.height > 0);
         if (!templates.length) templates = ['workstation','peripheral'].map(TagLayout.defaults);
+        for(const kind of ['workstation','peripheral']) {const compact=TagLayout.defaults(kind);if(!templates.some(t=>t.id===compact.id))templates.push(compact);}
     }
     function asset(kind, tag) {
         const ws = kind === 'workstation';
@@ -22,13 +23,13 @@ const TagStudio = (() => {
             device: ws ? item.deviceType || 'Workstation' : [item.category,item.brandManufacturer,item.modelSpecs].filter(Boolean).join(' · '),
             person:item.personnel?.fullName || item.userName || item.workstation?.personnel?.fullName || 'Unassigned',
             specs:ws ? ['CPU: '+(item.processorGen || '—'),'Motherboard: '+(item.motherboard || '—'),'RAM: '+(item.ram || '—'),'Storage: '+([item.ssd,item.hdd].filter(Boolean).join(' / ') || '—'),'GPU: '+(item.gpu || '—')].join('\n') : item.modelSpecs || '',
-            status:item.status, purchaseDate:formatDate(item.purchaseDate) } };
+            tagLabel:'Tag No: '+tag, personLabel:'Username: '+(item.personnel?.fullName || item.userName || item.workstation?.personnel?.fullName || 'Unassigned'), purchaseLabel:'Date Purchase: '+formatDate(item.purchaseDate), status:item.status, purchaseDate:formatDate(item.purchaseDate) } };
     }
     function qr(value) {
         if(qrCache.has(value)) return qrCache.get(value);
         if (!window.QRCode) throw Error('QR library could not load. Check your connection and reload before printing.');
         const holder = document.createElement('div');
-        new QRCode(holder, { text:value, width:256, height:256, correctLevel:QRCode.CorrectLevel.M });
+        new QRCode(holder, { text:value, width:256, height:256, correctLevel:QRCode.CorrectLevel.H });
         const canvas = holder.querySelector('canvas');
         if (!canvas) throw Error('Unable to generate QR code');
         const encoded=canvas.toDataURL('image/png');
@@ -40,7 +41,7 @@ const TagStudio = (() => {
         root.setAttribute('viewBox', `0 0 ${template.width} ${template.height}`);
         root.setAttribute('width','100%'); root.setAttribute('height','100%');
         root.setAttribute('role','img'); root.setAttribute('aria-label',`Tag ${record?.tag || template.name}`);
-        root.innerHTML = `<rect width="100%" height="100%" fill="${color(template.background,'#ffffff')}"/>`;
+        root.innerHTML = `<rect x="0.2" y="0.2" width="${template.width-.4}" height="${template.height-.4}" rx="2" stroke="#bdc3c7" stroke-width="0.35" fill="${color(template.background,'#ffffff')}"/>`;
         const qrImage = record ? qr(record.tag) : null;
         for (const e of template.elements) {
             const x=number(e.x), y=number(e.y), w=Math.max(1,number(e.w,20)), h=Math.max(1,number(e.h,10));
@@ -53,6 +54,7 @@ const TagStudio = (() => {
                     const image = document.createElementNS(root.namespaceURI,'image');
                     image.setAttribute('href',src); image.setAttribute('x',x); image.setAttribute('y',y); image.setAttribute('width',w); image.setAttribute('height',h); image.setAttribute('preserveAspectRatio','xMidYMid meet');
                     g.append(image);
+                    if(e.type==='qr'){const logo=getCompanyLogo();if(/^data:image\/(png|jpeg|gif);base64,/i.test(logo||'')){const side=w*.17,cx=x+(w-side)/2,cy=y+(h-side)/2;g.innerHTML+=`<rect x="${cx-.5}" y="${cy-.5}" width="${side+1}" height="${side+1}" fill="white"/><image href="${logo}" x="${cx}" y="${cy}" width="${side}" height="${side}" preserveAspectRatio="xMidYMid meet"/>`;}}
                 } else if (editing) g.innerHTML += `<text x="${x+1}" y="${y+4}" font-size="3" fill="#64748b">${esc(e.type === 'qr' ? 'QR · select a real asset' : e.type)}</text>`;
             } else {
                 const text = e.type === 'field' ? record?.fields[e.field] ?? `{${e.field}}` : e.text || 'Text';
@@ -67,6 +69,7 @@ const TagStudio = (() => {
                         lines.push(rest);
                     }
                     if (lines.length*size*1.25<=h-pad*2) break;
+                    if(size*0.9<2.5) throw Error('Tag '+(record?.tag||'preview')+': text exceeds the readable area. Increase this field or template size in Tag Customizer.');
                     size*=0.9;
                 }
                 const anchor=e.align==='center'?'middle':e.align==='right'?'end':'start';
@@ -83,10 +86,10 @@ const TagStudio = (() => {
     }
     function templateFor(kind) {
         const id=data.settings[kind==='workstation'?'workstationTemplate':'peripheralTemplate'];
-        const saved=templates.find(t=>t.id===id) || templates.find(t=>t.kind===kind);
+        const saved=templates.find(t=>t.id===id) || templates.find(t=>t.id===`compact-${kind}`);
         const t=clone(saved || TagLayout.defaults(kind));
         // Preserve the previous simple customizer configuration for default templates.
-        if(t.id.startsWith('default-')) {
+        if(t.id.startsWith('default-') || t.id.startsWith('compact-')) {
             const c=getTagConfig();
             t.elements=t.elements.filter(e=> (c.showCompany || !['logo','company','address'].includes(e.id)) && (c.showUser || e.id!=='person') && (c.showDeviceName || !['device','specs'].includes(e.id)));
         }

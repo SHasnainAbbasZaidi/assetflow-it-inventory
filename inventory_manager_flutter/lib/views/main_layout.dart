@@ -38,12 +38,12 @@ class _MainLayoutState extends State<MainLayout> {
     {
       'title': 'Workstations',
       'icon': Icons.computer_rounded,
-      'view': const WorkstationsView()
+      'view': const DashboardView(initialGroup: 'Workstations')
     },
     {
       'title': 'Peripherals',
       'icon': Icons.mouse_rounded,
-      'view': const PeripheralsView()
+      'view': const DashboardView(initialGroup: 'Peripherals')
     },
     {
       'title': 'Personnel',
@@ -75,6 +75,8 @@ class _MainLayoutState extends State<MainLayout> {
       'icon': Icons.assessment_outlined,
       'view': const AdminToolsView(mode: 'reports')
     },
+    {'title': 'Devices', 'icon': Icons.print_outlined, 'view': const DashboardView(initialGroup: 'Devices')},
+    {'title': 'Components', 'icon': Icons.memory, 'view': const DashboardView(initialGroup: 'Components')},
   ];
 
   void _onSearchChanged(String query) {

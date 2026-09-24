@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../utils/hardware_groups.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -14,7 +15,8 @@ import 'package:inventory_manager_flutter/utils/file_saver_stub.dart'
 
 class PeripheralsView extends StatefulWidget {
   final String searchQuery;
-  const PeripheralsView({super.key, this.searchQuery = ''});
+  final String? hardwareGroup;
+  const PeripheralsView({super.key, this.searchQuery = '', this.hardwareGroup});
 
   @override
   State<PeripheralsView> createState() => _PeripheralsViewState();
@@ -121,6 +123,7 @@ class _PeripheralsViewState extends State<PeripheralsView> {
     final assets = provider.peripherals;
 
     final filteredAssets = assets.where((asset) {
+      if(widget.hardwareGroup!=null && HardwareGroups.classify(asset.category)!=widget.hardwareGroup) return false;
       final query = widget.searchQuery.toLowerCase();
       if (query.isEmpty) return true;
 
@@ -425,7 +428,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     final provider = Provider.of<InventoryProvider>(context, listen: false);
 
     // Core fields
-    final coreFields = AssetCategorySchemas.schemas[_category] ?? [];
+    final coreFields = AssetCategorySchemas.fieldsFor(_category);
     for (final field in coreFields) {
       final id = field['id']!;
       final val = _customFields[id]?.toString() ?? '';
@@ -452,7 +455,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     final provider = Provider.of<InventoryProvider>(context);
     final isEdit = widget.asset != null;
 
-    final coreFields = AssetCategorySchemas.schemas[_category] ?? [];
+    final coreFields = AssetCategorySchemas.fieldsFor(_category);
     final dynamicFields = provider.customFieldsConfig.where((f) => f['target'] == 'Peripheral').toList();
 
     return AlertDialog(
@@ -469,7 +472,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
                 DropdownButtonFormField<String>(
                   value: _category.isEmpty ? null : _category,
                   decoration: const InputDecoration(labelText: 'Peripheral Type'),
-                  items: ['Peripheral', 'Monitor', 'Keyboard', 'Mouse', 'Printer'].map((cat) {
+                  items: {...AssetCategorySchemas.categories, _category}.map((cat) {
                     return DropdownMenuItem<String>(value: cat, child: Text(cat));
                   }).toList(),
                   validator: (value) => value == null ? 'Select a category' : null,

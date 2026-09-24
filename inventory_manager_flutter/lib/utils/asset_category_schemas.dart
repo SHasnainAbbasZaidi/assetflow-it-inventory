@@ -1,5 +1,21 @@
 class AssetCategorySchemas {
+  static List<Map<String,String>> fieldsFor(String category) {
+    if(category=='Workstation') return const [
+      {'id':'cpu','label':'Processor (CPU)'}, {'id':'motherboard','label':'Motherboard'},
+      {'id':'ram','label':'RAM'}, {'id':'storage','label':'SSD / primary storage'},
+      {'id':'gpu','label':'GPU'}, {'id':'notes','label':'Notes'},
+    ];
+    final fields=<Map<String,String>>[
+      {'id':'deviceType','label':'Brand / manufacturer'},
+      {'id':'model','label':'Model / specifications'},
+      ...?schemas[category],
+      if(['RAM','SSD','HDD'].contains(category)) {'id':'storage','label':'Capacity / specifications'},
+      if(category=='GPU') {'id':'gpu','label':'GPU specifications'},
+    ];
+    final seen=<String>{};return fields.where((field)=>seen.add(field['id']!)).toList();
+  }
   static const List<String> categories = [
+    'Motherboard', 'RAM', 'SSD', 'HDD', 'GPU', 'CPU', 'Power Supply', 'Webcam', 'VR', 'Router', 'Mini PC', 'All-in-One PC', 'Assembled PC',
     'PC/Laptop',
     'Laptop',
     'Desktop',

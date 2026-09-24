@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { prisma } from './prisma.js';
 import { AssetStatus, exportWorkbook, importWorkbook } from './services/excel-service.js';
 import { errorHandler, httpError, notFound } from './middleware/errors.js';
+import {registerScrapped,reconcileScrapped} from './services/scrap-service.js';
 import {databasePath} from './runtime-config.js';
 import {upgradeDatabase} from './services/database-upgrade.js';
 import { assignAsset, assignmentState } from './services/assignment-service.js';
@@ -509,6 +510,16 @@ app.patch('/api/assets/:kind/:tag/status', requireAuth, requireRole(['ADMIN', 'E
     throw httpError(400, 'kind must be workstation or peripheral.', 'VALIDATION_ERROR');
   }
   const { status } = parsed(z.object({ status: statusSchema }), req.body);
+  if(status==='SCRAPPED') {
+    if(req.auth.role!=='ADMIN')throw httpError(403,'Administrator access required to scrap items.');
+    const kind=req.params.kind,tag=req.params.tag,key=kind==='workstation'?'workstationTag':'peripheralTag';
+    const result=await prisma.$transaction(async tx=>{
+      const model=kind==='workstation'?tx.workstation:tx.peripheral;
+      await model.update({where:{[key]:tag},data:{status:'SCRAPPED'}});
+      await registerScrapped(tx,kind,tag,{name:req.auth.fullName,email:req.auth.email,role:req.auth.role});
+      return model.findUnique({where:{[key]:tag}});
+    });return res.json(result);
+  }
   res.json(await changeStatus(req.params.kind, req.params.tag, status, req.auth.email));
 });
 
@@ -702,7 +713,7 @@ app.post('/api/excel/import', requireAuth, requireRole(['ADMIN']), upload.single
   if (!req.file || !req.file.originalname.toLowerCase().endsWith('.xlsx')) {
     throw httpError(400, 'Please upload one .xlsx file in the "file" form field.', 'INVALID_UPLOAD');
   }
-  const result = await importWorkbook(req.file.buffer, prisma);
+  const result = await importWorkbook(req.file.buffer, prisma, {name:req.auth.fullName,email:req.auth.email,role:req.auth.role});
   await prisma.auditLog.create({
     data: {
       logId: crypto.randomUUID(),
@@ -740,6 +751,7 @@ const port = Number(process.env.PORT || 5555);
 async function startServer() {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) throw new Error('Set a persistent JWT_SECRET of at least 32 characters.');
   await upgradeDatabase(prisma,databasePath);
+  await reconcileScrapped(prisma);
   backups.start(24);
 
   app.listen(port, '0.0.0.0', () => {

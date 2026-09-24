@@ -41,3 +41,9 @@ flutter test
 ```
 
 The release APK and checksums are published in [GitHub Releases](https://github.com/SHasnainAbbasZaidi/assetflow-it-inventory/releases). Keep the same Android application ID and signing key when updating an installed app.
+
+## Inventory dashboard and tag reference
+
+Version 1.2.0 groups inventory into Workstations, Peripherals, Devices and Components on web and Android. Classification is a view of existing records; upgrades do not move or recreate assets. Mobile sign-in remains Server URL, Username and Password. [View the reference screenshots](docs/screenshots/v1.2.0/README.md).
+
+Compact A4 layouts follow the supplied tag reference and preserve actual label size. Scrap status updates and imports automatically register reports. Older scrapped records with missing history are explicitly marked as having an unknown original scrap date/operator.

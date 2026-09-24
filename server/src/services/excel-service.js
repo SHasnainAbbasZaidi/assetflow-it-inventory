@@ -1,4 +1,5 @@
 import ExcelJS from 'exceljs';
+import {registerScrapped} from './scrap-service.js';
 
 export const AssetStatus = {
   IN_STORE: 'IN_STORE',
@@ -39,7 +40,7 @@ function assertHeaders(sheet, expected) {
 }
 
 /** Imports independently-valid rows. A bad row never rolls back other rows. */
-export async function importWorkbook(buffer, prisma) {
+export async function importWorkbook(buffer, prisma, operator) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
   for (const [name, headers] of Object.entries(SHEETS)) {
@@ -83,7 +84,13 @@ export async function importWorkbook(buffer, prisma) {
     const data = { userName, personnelId, deviceType: toText(v['Device Type']) || null, motherboard: toText(v.Motherboard) || null, processorGen: toText(v['Processor & Gen']) || null, ram: toText(v.RAM) || null, ssd: toText(v.SSD) || null, hdd: toText(v.HDD) || null, gpu: toText(v.GPU) || null, status, assignedDate, pdfFile: toText(v['PDF File']) || null, notes: toText(v.Notes) || null };
     const exists = await prisma.workstation.findUnique({ where: { workstationTag: tag } });
     if(exists?.status==='SCRAPPED') { fail(result,'Workstations',row.number,'Scrapped items cannot be overwritten by import.'); continue; }
-    await prisma.workstation.upsert({ where: { workstationTag: tag }, create: { workstationTag: tag, ...data }, update: data }); result[exists ? 'updated' : 'inserted']++;
+    try {
+      await prisma.$transaction(async tx=>{
+        await tx.workstation.upsert({where:{workstationTag:tag},create:{workstationTag:tag,...data},update:data});
+        if(status==='SCRAPPED'){if(!operator)throw new Error('A verified operator is required to import scrapped items.');await registerScrapped(tx,'workstation',tag,operator);}
+      });
+      result[exists?'updated':'inserted']++;
+    }catch(error){fail(result,'Workstations',row.number,error.message);}
   }
   for (const row of workbook.getWorksheet('Peripherals').getRows(2, workbook.getWorksheet('Peripherals').rowCount - 1) || []) {
     const v = rowValues(row, SHEETS.Peripherals); const tag = toText(v['Peripheral Tag']); const wsTag = toText(v['Workstation Tag']); const status = parseStatus(toText(v.Status) || 'IN STORE'); const purchaseDate = toDate(v['Purchase Date']); const warrantyExpiry = toDate(v['Warranty Expiry']); const quantity = Number(v.Quantity ?? 1);
@@ -93,7 +100,13 @@ export async function importWorkbook(buffer, prisma) {
     const data = { category: toText(v.Category) || null, modelSpecs: toText(v['Model Specs']) || null, workstationTag: wsTag || null, status, purchaseDate, warrantyExpiry, brandManufacturer: toText(v['Brand / Manufacturer']) || null, quantity, storageCapacity: toText(v['Storage Capacity']) || null, gpuSpecs: toText(v['GPU Specs']) || null };
     const exists = await prisma.peripheral.findUnique({ where: { peripheralTag: tag } });
     if(exists?.status==='SCRAPPED') { fail(result,'Peripherals',row.number,'Scrapped items cannot be overwritten by import.'); continue; }
-    await prisma.peripheral.upsert({ where: { peripheralTag: tag }, create: { peripheralTag: tag, ...data }, update: data }); result[exists ? 'updated' : 'inserted']++;
+    try {
+      await prisma.$transaction(async tx=>{
+        await tx.peripheral.upsert({where:{peripheralTag:tag},create:{peripheralTag:tag,...data},update:data});
+        if(status==='SCRAPPED'){if(!operator)throw new Error('A verified operator is required to import scrapped items.');await registerScrapped(tx,'peripheral',tag,operator);}
+      });
+      result[exists?'updated':'inserted']++;
+    }catch(error){fail(result,'Peripherals',row.number,error.message);}
   }
   for (const row of workbook.getWorksheet('Audit Logs').getRows(2, workbook.getWorksheet('Audit Logs').rowCount - 1) || []) {
     const v = rowValues(row, SHEETS['Audit Logs']); const logId = toText(v['Log ID']); const timestamp = toDate(v.Timestamp);

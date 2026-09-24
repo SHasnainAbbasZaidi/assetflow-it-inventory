@@ -33,15 +33,15 @@ const fs=require('node:fs/promises'),path=require('node:path'),assert=require('n
  await page.getByRole('button',{name:'Duplicate',exact:true}).click();assert.match(await page.locator('#templateName').inputValue(),/copy/);
  // Restore default templates in this isolated fixture so print checks cover standard A6/A7 layouts.
  await page.evaluate(async()=>{await api('/api/settings',{method:'POST',body:{tagTemplates:'',workstationTemplate:'',peripheralTemplate:''}});data.settings.tagTemplates='';data.settings.workstationTemplate='';data.settings.peripheralTemplate='';});
- await page.locator('[data-tab="workstations"]').click();await page.locator('#wsSearchInput').fill('QA-WS');await page.getByRole('button',{name:'Select All Shown'}).click();
+ await page.locator('[data-tab="workstations"]').click();await page.locator('#hardwareSearch').fill('QA-WS');await page.getByRole('button',{name:'Select All Shown'}).click();
  assert.equal(await page.locator('.tag-select:checked').count(),5);
- await page.locator('[data-tab="peripherals"]').click();await page.locator('#perSearchInput').fill('QA-PER');await page.getByRole('button',{name:'Select All Shown'}).click();await page.getByRole('button',{name:'Print Selected',exact:true}).click();
- const frame=page.frameLocator('#tagPrintFrame');await frame.locator('.sheet').first().waitFor();assert.equal(await frame.locator('.sheet').count(),4);assert.equal(await frame.locator('.label').count(),14);
+ await page.locator('[data-tab="peripherals"]').click();await page.locator('#hardwareSearch').fill('QA-PER');await page.getByRole('button',{name:'Select All Shown'}).click();await page.getByRole('button',{name:'Print Selected',exact:true}).click();
+ const frame=page.frameLocator('#tagPrintFrame');await frame.locator('.sheet').first().waitFor();assert.equal(await frame.locator('.sheet').count(),2);assert.equal(await frame.locator('.label').count(),14);
  const geometry=await page.locator('#tagPrintFrame').evaluate(el=>Array.from(el.contentDocument.querySelectorAll('.sheet')).map(sheet=>{const s=sheet.getBoundingClientRect();return Array.from(sheet.querySelectorAll('.label')).every(label=>{const r=label.getBoundingClientRect();return r.left>=s.left&&r.right<=s.right+1&&r.top>=s.top&&r.bottom<=s.bottom+1;});}));assert.ok(geometry.every(Boolean));
  const html=await page.locator('#tagPrintFrame').evaluate(el=>el.contentDocument.documentElement.outerHTML);
  const printPage=await browser.newPage();await printPage.setContent(html);await printPage.emulateMedia({media:'print'});
  const pdf=await printPage.pdf({path:path.join(folder,'bulk-tags.pdf'),preferCSSPageSize:true,printBackground:true});
- const pages=(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;assert.equal(pages,4);
+ const pages=(pdf.toString('latin1').match(/\/Type\s*\/Page\b/g)||[]).length;assert.equal(pages,2);
  await printPage.screenshot({path:path.join(folder,'print-preview.png'),fullPage:true});
  await page.locator('#tagPrintModal .modal-header button').click();await page.locator('[data-tab="settings"]').click();await page.locator('.subnav-btn').filter({hasText:'Tag Customizer'}).click();await page.screenshot({path:path.join(folder,'editor-desktop.png'),fullPage:true});
  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(folder,'editor-mobile.png'),fullPage:true});

@@ -4,17 +4,17 @@ Developed by Hasnain Zaidi. Flutter builds are separate from the Node hosting se
 
 ## Launcher icon and release build
 
-Save the application logo in web Settings → Company Details & Logo, then from the repository root on Windows run:
+The QR application icon at `assets/images/default_logo.png` is the default for future builds. From the repository root on Windows run:
 
 ```powershell
-./scripts/build-branded-apk.ps1 -ServerUrl http://localhost:3000
+./scripts/build-branded-apk.ps1
 ```
 
-Alternatively pass `-LogoPath C:/path/to/application-logo.png`. The script saves the uploaded source as `assets/images/launcher_logo.png`, generates every Android launcher density, then builds the release APK. The saved source/icons are versioned so subsequent normal Flutter builds retain the chosen logo. If no logo is saved on the server, the build script reuses the saved launcher source; it does not substitute the Flutter icon. Use `-IconsOnly` to update just the icon resources.
+The script generates all Android launcher densities and builds the APK without needing a running server. An explicit `-LogoPath C:/path/to/logo.png` overrides the default for that build; `-IconsOnly` updates just the icon resources. Company branding inside the app does not silently change the launcher icon.
 
 The script also works around Windows JDK temporary socket-path failures with a workspace-local socket directory. It replaces `server/public/download/app-release.apk` only after a successful release build.
 
-The version is in `pubspec.yaml`; version 1.1.0+2 means display version 1.1.0 and Android version code 2. Keep the existing application ID (`com.assetflow.inventory_manager_flutter`) and signing key when updating installed copies. The current project uses its established debug keystore for compatibility; protect it and plan any signing-key change separately.
+The version is in `pubspec.yaml`; version 1.2.0+3 means display version 1.2.0 and Android version code 3. Keep the existing application ID (`com.assetflow.inventory_manager_flutter`) and signing key when updating installed copies. The current project uses its established debug keystore for compatibility; protect it and plan any signing-key change separately.
 
 ## Features and checks
 
@@ -27,4 +27,4 @@ flutter test
 flutter build apk --release
 ```
 
-The last command uses the already-generated launcher icons. Use the PowerShell script whenever the uploaded logo changes. Install the APK as an update rather than uninstalling the existing app. Configure the self-hosted HTTPS server address before signing in.
+The last command uses the already-generated launcher icons. Use the PowerShell script for the default QR icon or an explicit logo override. Install the APK as an update rather than uninstalling the existing app. Configure the self-hosted HTTPS server address before signing in.

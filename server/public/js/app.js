@@ -271,9 +271,11 @@ function switchTab(tab) {
     if (!container) return;
     if (dataLoadError && !['settings'].includes(tab)) { container.innerHTML = '<div class="settings-pane"><h2>Data could not be loaded</h2><p>Your records have not been replaced. Check the server connection and database status.</p><button class="btn btn-primary" onclick="loadAllData().then(() => switchTab(currentTab))">Retry</button></div>'; return; }
 
-    if (tab === 'dashboard') renderDashboard(container);
-    else if (tab === 'workstations') renderWorkstations(container);
-    else if (tab === 'peripherals') renderPeripherals(container);
+    if (tab === 'dashboard') renderHardwareDashboard(container);
+    else if (tab === 'devices') renderHardwareDashboard(container, 'Devices');
+    else if (tab === 'components') renderHardwareDashboard(container, 'Components');
+    else if (tab === 'workstations') renderHardwareDashboard(container, 'Workstations');
+    else if (tab === 'peripherals') renderHardwareDashboard(container, 'Peripherals');
     else if (tab === 'personnel') renderPersonnel(container);
     else if (tab === 'logs') renderLogs(container);
     else if (tab === 'excel') renderExcelTools(container);
@@ -553,15 +555,18 @@ function filterWorkstations() {
 // =====================================================================
 // 3. PERIPHERALS VIEW (Dedicated Standalone Tab)
 // =====================================================================
-function renderPeripherals(container) {
+let peripheralGroup = 'Peripherals';
+function renderPeripherals(container, group = 'Peripherals') {
+    peripheralGroup=group;
+    const groupItems=data.peripherals.filter(p=>HardwareGroups.classify(p.category)===group);
     const isViewer = currentUser?.role === 'VIEWER';
-    const categories = [...new Set(data.peripherals.map(p => p.category).filter(Boolean))];
+    const categories = [...new Set(groupItems.map(p => p.category).filter(Boolean))];
 
     container.innerHTML = `
         <div class="page-header">
             <div class="page-title">
-                <h1>Peripherals</h1>
-                <p>Manage displays, keyboards, VR gear, mice, and other accessories</p>
+                <h1>${group}</h1>
+                <p>${hardwareDescriptions[group]}</p>
             </div>
             <div class="header-controls">
                 ${!isViewer ? `<button class="btn btn-primary" onclick="openPeripheralModal()"><i class="ph ph-plus"></i> New Peripheral</button>` : ''}
@@ -594,7 +599,7 @@ function renderPeripherals(container) {
                 <table>
                     <thead>
                         <tr>
-                            <th>Peripheral Tag</th>
+                            <th>Item Tag</th>
                             <th>Category</th>
                             <th>Brand & Model Specs</th>
                             <th>Linked Host Machine</th>
@@ -605,7 +610,7 @@ function renderPeripherals(container) {
                         </tr>
                     </thead>
                     <tbody id="perTableBody">
-                        ${generatePeripheralsRows(data.peripherals)}
+                        ${generatePeripheralsRows(groupItems)}
                     </tbody>
                 </table>
             </div>
@@ -663,6 +668,7 @@ function filterPeripherals() {
     const status = document.getElementById('perStatusFilter')?.value || '';
 
     const filtered = data.peripherals.filter(p => {
+        if(HardwareGroups.classify(p.category)!==peripheralGroup) return false;
         const matchesQuery = !q ||
             p.peripheralTag.toLowerCase().includes(q) ||
             (p.category && p.category.toLowerCase().includes(q)) ||

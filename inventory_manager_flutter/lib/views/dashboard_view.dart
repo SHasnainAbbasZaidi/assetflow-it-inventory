@@ -1,215 +1,73 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:inventory_manager_flutter/services/database_service.dart';
-import 'dart:convert';
+import '../models/asset.dart';
+import '../services/database_service.dart';
+import '../utils/hardware_groups.dart';
+import 'asset_qr_dialog.dart';
+import 'workstations_view.dart' as ws;
+import 'peripherals_view.dart' as peripheral;
 
-class DashboardView extends StatelessWidget {
-  const DashboardView({super.key});
-
+class DashboardView extends StatefulWidget {
+  final String initialGroup;
+  const DashboardView({super.key, this.initialGroup = 'Workstations'});
+  @override
+  State<DashboardView> createState() => _DashboardViewState();
+}
+class _DashboardViewState extends State<DashboardView> {
+  late String group = widget.initialGroup;
+  String query = '', status = '';
+  @override
+  void didUpdateWidget(covariant DashboardView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialGroup != widget.initialGroup) group = widget.initialGroup;
+  }
   @override
   Widget build(BuildContext context) {
-    final provider = Provider.of<InventoryProvider>(context);
+    final provider = context.watch<InventoryProvider>();
     final assets = provider.assets;
-
-    final int total = assets.where((a) => a.status != 'Retired').length;
-    final int available = assets.where((a) => a.status == 'In Store').length;
-    final int inUse = assets.where((a) => a.status == 'Assigned').length;
-    final int retired = assets.where((a) => a.status == 'Retired').length;
-
-    final double screenWidth = MediaQuery.of(context).size.width;
-    final int crossAxisCount =
-        screenWidth > 1200 ? 4 : (screenWidth > 600 ? 2 : 1);
-
-    Widget logoWidget;
-    if (provider.companyLogo.isNotEmpty) {
-      try {
-        final cleanStr = provider.companyLogo.contains(',')
-            ? provider.companyLogo.split(',')[1]
-            : provider.companyLogo;
-        logoWidget = Image.memory(base64Decode(cleanStr),
-            width: 48, height: 48, fit: BoxFit.contain);
-      } catch (e) {
-        logoWidget = Image.asset('assets/images/default_logo.png',
-            width: 48, height: 48, fit: BoxFit.contain);
-      }
-    } else {
-      logoWidget = Image.asset('assets/images/default_logo.png',
-          width: 48, height: 48, fit: BoxFit.contain);
-    }
-
-    final companyName = provider.companyName.isNotEmpty
-        ? provider.companyName
-        : 'AssetFlow Premium';
-    final companyAddress = provider.companyAddress;
-
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(screenWidth < 600 ? 16 : 32),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                    child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        borderRadius: BorderRadius.circular(12),
-                        border:
-                            Border.all(color: Colors.white.withOpacity(0.1)),
-                      ),
-                      child: logoWidget,
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                        child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          companyName,
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(fontSize: 24),
-                        ),
-                        if (companyAddress.isNotEmpty)
-                          Text(
-                            companyAddress,
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          )
-                        else
-                          Text(
-                            'IT Inventory Management',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                      ],
-                    )),
-                  ],
-                )),
-                if (screenWidth >= 850)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        'Overview',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontSize: 28),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Welcome back. Here\'s your inventory status.',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
-                  )
-              ],
-            ),
-            const SizedBox(height: 32),
-            GridView.count(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 20,
-              mainAxisSpacing: 20,
-              childAspectRatio: screenWidth > 600 ? 1.6 : 2.2,
-              children: [
-                _buildStatCard(
-                  context,
-                  title: 'Active Assets',
-                  value: total.toString(),
-                  icon: Icons.devices_rounded,
-                  iconColor: const Color(0xFF6366F1),
-                  bgColor: const Color(0xFF6366F1).withOpacity(0.12),
-                ),
-                _buildStatCard(
-                  context,
-                  title: 'In Store',
-                  value: available.toString(),
-                  icon: Icons.check_circle_outline_rounded,
-                  iconColor: const Color(0xFF10B981),
-                  bgColor: const Color(0xFF10B981).withOpacity(0.12),
-                ),
-                _buildStatCard(
-                  context,
-                  title: 'Assigned',
-                  value: inUse.toString(),
-                  icon: Icons.person_outline_rounded,
-                  iconColor: const Color(0xFF3B82F6),
-                  bgColor: const Color(0xFF3B82F6).withOpacity(0.12),
-                ),
-                _buildStatCard(
-                  context,
-                  title: 'Deprecated',
-                  value: retired.toString(),
-                  icon: Icons.delete_outline_rounded,
-                  iconColor: const Color(0xFFF43F5E),
-                  bgColor: const Color(0xFFF43F5E).withOpacity(0.12),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(
-    BuildContext context, {
-    required String title,
-    required String value,
-    required IconData icon,
-    required Color iconColor,
-    required Color bgColor,
-  }) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: const Color(0xFF9CA3AF),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: bgColor,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: iconColor,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-            Text(
-              value,
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-          ],
-        ),
-      ),
-    );
+    String category(Asset a) => HardwareGroups.classify(a.category, workstation: provider.workstations.contains(a));
+    final filtered = assets.where((a) => category(a) == group && (status.isEmpty || a.status == status) && '${a.id} ${a.category} ${a.assignee} ${a.customFields}'.toLowerCase().contains(query.toLowerCase())).toList();
+    return Scaffold(backgroundColor: Colors.transparent, body: LayoutBuilder(builder: (context, constraints) {
+      final narrow = constraints.maxWidth < 600;
+      return ListView(padding: EdgeInsets.all(narrow ? 16 : 28), children: [
+        Text('Inventory Dashboard', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: 6),
+        const Text('Every item, organized by hardware category'),
+        const SizedBox(height: 22),
+        Wrap(spacing: 12, runSpacing: 12, children: [
+          for (final entry in {'Total inventory': assets.length, 'Assigned': assets.where((a) => a.status == 'Assigned').length, 'In store': assets.where((a) => a.status == 'In Store').length, 'Scrapped': assets.where((a) => a.status == 'Scrapped').length}.entries)
+            SizedBox(width: (constraints.maxWidth - (narrow ? 44 : 92)) / (narrow ? 2 : 4), child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(entry.key), const SizedBox(height: 8), Text('${entry.value}', style: Theme.of(context).textTheme.headlineMedium)])))),
+        ]),
+        const SizedBox(height: 20),
+        SingleChildScrollView(scrollDirection: Axis.horizontal, child: Row(children: [
+          for (final name in HardwareGroups.names) Padding(padding: const EdgeInsets.only(right: 8), child: ChoiceChip(label: Text('$name  ${assets.where((a) => category(a) == name).length}'), selected: group == name, onSelected: (_) => setState(() { group = name; status = ''; }))),
+        ])),
+        const SizedBox(height: 20),
+        Text(group, style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 6),
+        Text(HardwareGroups.descriptions[group]!),
+        Align(alignment: Alignment.centerLeft, child: TextButton.icon(icon: const Icon(Icons.table_rows_outlined), label: const Text('Full list, import & bulk print'), onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => Scaffold(appBar: AppBar(title: Text(group)), body: group == 'Workstations' ? const ws.WorkstationsView() : peripheral.PeripheralsView(hardwareGroup: group)))))),
+        const SizedBox(height: 12),
+        Align(alignment: Alignment.centerLeft, child: FilledButton.icon(icon: const Icon(Icons.add), label: const Text('Add item'), onPressed: () => showDialog(context: context, builder: (_) => group == 'Workstations' ? const ws.AssetFormDialog(category: 'Workstation') : peripheral.AssetFormDialog(category: group == 'Devices' ? 'Printer' : group == 'Components' ? 'RAM' : 'Keyboard')))),
+        const SizedBox(height: 16),
+        TextField(decoration: const InputDecoration(labelText: 'Search tag, details or owner', prefixIcon: Icon(Icons.search)), onChanged: (value) => setState(() => query = value)),
+        const SizedBox(height: 12),
+        DropdownButtonFormField<String>(key: ValueKey(group), initialValue: status, decoration: const InputDecoration(labelText: 'Status'), items: [const DropdownMenuItem(value: '', child: Text('All statuses')), for (final s in ['In Store','Assigned','Out of Order','Retired','Scrapped']) DropdownMenuItem(value: s, child: Text(s))], onChanged: (value) => setState(() => status = value ?? '')),
+        const SizedBox(height: 16),
+        if (filtered.isEmpty) const Padding(padding: EdgeInsets.all(24), child: Text('No items match this category and filter.')),
+        for (final asset in filtered) Card(margin: const EdgeInsets.only(bottom: 12), child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Wrap(spacing: 12, runSpacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [Text(asset.id, style: const TextStyle(fontWeight: FontWeight.bold)), Chip(label: Text(asset.status))]),
+          Text(provider.workstations.contains(asset) ? asset.customFields['deviceType']?.toString() ?? 'Workstation' : asset.category, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text('Owner: ${asset.assignee.isEmpty ? 'Unassigned' : asset.assignee}'),
+          const SizedBox(height: 12),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            OutlinedButton.icon(icon: const Icon(Icons.qr_code), label: const Text('Details & tag'), onPressed: () => showDialog(context: context, builder: (_) => AssetQrDialog(asset: asset))),
+            if (asset.status != 'Scrapped') OutlinedButton.icon(icon: const Icon(Icons.edit_outlined), label: const Text('Edit'), onPressed: () => showDialog(context: context, builder: (_) => provider.workstations.contains(asset) ? ws.AssetFormDialog(asset: asset, category: 'Workstation') : peripheral.AssetFormDialog(asset: asset, category: asset.category))),
+          ]),
+        ]))),
+        const SizedBox(height: 80),
+      ]);
+    }));
   }
 }
