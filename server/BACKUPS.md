@@ -20,6 +20,10 @@ Full-state snapshots contain every scalar field from all seven database models: 
 
 ## Restore
 
+Excel exports and daily Excel backups now organize hardware into Workstations, Peripherals, Devices and Components, using the same category rules as the app. Standalone motherboard records appear under Workstations while keeping their original record identity. The hidden `Record Type` column must be retained for import. Personnel IDs, direct assignments, workstation links, dates, specifications and custom-field JSON are preserved. Current exports also include Personnel, Users and Audit Logs. Current-format imports commit atomically; an invalid reference changes nothing. Existing scrapped records remain protected from overwrite. Legacy four-sheet workbooks are still accepted through the original importer.
+
+Daily Excel backups additionally include reference settings and custom-field definitions. Excel import does not restore those extra reference sheets, passwords, encrypted AI keys or saved report history; use a full-state JSON backup for complete recovery. JSON backups include a readable `inventoryGroups` index for the four categories. This index is informational; restore verifies and restores the authoritative checksummed tables and the app derives categories again. Older JSON backups without the index remain supported.
+
 Settings → Backup and Restore accepts a saved server backup or an uploaded full-state JSON file (maximum 100 MB). Type `RESTORE` to confirm replacement. The server verifies the format, checksum and field schema, requires an active administrator account in the backup, saves a recovery snapshot, and restores all database tables in one transaction. Invalid relationships roll back the entire restore. Sign in using credentials from the restored snapshot afterward.
 
 Backups contain sensitive account and settings data. Access is checked against the current active administrator account in the database on every administrator-tools request. Store downloaded backups securely.

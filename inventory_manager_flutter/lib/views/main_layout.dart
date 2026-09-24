@@ -1,4 +1,5 @@
 import 'admin_tools_view.dart';
+import 'inventory_overview_view.dart';
 import '../providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -33,7 +34,7 @@ class _MainLayoutState extends State<MainLayout> {
     {
       'title': 'Dashboard',
       'icon': Icons.grid_view_rounded,
-      'view': const DashboardView()
+      'view': const InventoryOverviewView()
     },
     {
       'title': 'Workstations',

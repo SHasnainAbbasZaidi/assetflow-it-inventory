@@ -8,7 +8,7 @@ const jsQR=require('../../.build-tools/node_modules/jsqr'),{PNG}=require('../../
  const db=new DatabaseSync(dbPath);db.exec(await fs.readFile('prisma/initial-schema.sql','utf8'));db.close();
  process.env.NODE_ENV='test';process.env.DATABASE_URL='file:'+dbPath.replaceAll('\\','/');process.env.JWT_SECRET='isolated-release-screenshot-secret-123456789';process.env.BACKUP_ROOT=folder;
  const {app}=await import('../src/server.js'),{prisma}=await import('../src/prisma.js');
- const output=path.resolve('../docs/screenshots/v1.2.0');await fs.mkdir(output,{recursive:true});
+ const output=path.resolve(process.env.ASSETFLOW_SCREENSHOTS || '../docs/screenshots/v1.2.0');await fs.mkdir(output,{recursive:true});
  await prisma.appUser.create({data:{email:'demo@example.invalid',fullName:'Demo operator',role:'ADMIN'}});
  await prisma.personnel.create({data:{id:'demo-person',fullName:'Demo operator',department:'Design'}});
  for(let i=0;i<8;i++)await prisma.workstation.create({data:{workstationTag:'DEMO-PC-'+(1001+i),deviceType:['Assembled PC','Laptop','Mini PC','All-in-One PC'][i%4],processorGen:'Intel Core i7',motherboard:'B760',ram:'32 GB DDR5',ssd:'1 TB NVMe',gpu:'RTX 4060',personnelId:i%2?'demo-person':null,status:i%2?'ASSIGNED':'IN_STORE'}});
@@ -21,7 +21,7 @@ const jsQR=require('../../.build-tools/node_modules/jsqr'),{PNG}=require('../../
  try{
   const page=await browser.newPage({viewport:{width:1440,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(({token})=>{localStorage.setItem('assetflow_token',token);localStorage.setItem('assetflow_user',JSON.stringify({email:'demo@example.invalid',fullName:'Demo operator',role:'ADMIN'}));},{token});
-  await page.goto(base);await page.getByRole('heading',{name:'Inventory Dashboard'}).waitFor();await page.waitForFunction(()=>typeof QRCode!=='undefined');
+  await page.goto(base);await page.getByRole('heading',{name:'Dashboard Overview'}).waitFor();assert.equal(await page.locator('#hardwareSearch').count(),0);await page.screenshot({path:path.join(output,'overview-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await page.screenshot({path:path.join(output,'overview-phone.png'),fullPage:true,animations:'disabled'});await page.setViewportSize({width:1440,height:1000});await page.getByRole('button',{name:'View workstations',exact:true}).click();await page.getByRole('heading',{name:'Workstations',exact:true}).first().waitFor();await page.waitForFunction(()=>typeof QRCode!=='undefined');
   assert.equal(await page.locator('.hardware-card').count(),9);
   await page.screenshot({path:path.join(output,'dashboard-desktop.png'),fullPage:true});
   for(const [group,count] of [['Peripherals',4],['Devices',4],['Components',4],['Workstations',9]]){await page.getByRole('tab',{name:new RegExp('^'+group)}).click();assert.equal(await page.locator('.hardware-card').count(),count);}

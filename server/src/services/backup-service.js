@@ -1,3 +1,4 @@
+import {categoryWorkbook,inventoryGroups} from './hardware-workbook.js';
 // AssetFlow — a product of Mahzaidex Tech Developed by Hasnain Zaidi.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -24,7 +25,7 @@ const stateSchema = z.object(Object.fromEntries(modelNames.map(n => [n, schemas[
 export async function snapshot(prisma) {
   const rows = await prisma.$transaction(modelNames.map(n => prisma[n].findMany()));
   const tables = JSON.parse(JSON.stringify(Object.fromEntries(modelNames.map((n,i) => [n,rows[i]]))));
-  return {format:'assetflow-state', version:1, createdAt:new Date().toISOString(), checksum:digest(tables), tables};
+  return {format:'assetflow-state', version:1, createdAt:new Date().toISOString(), checksum:digest(tables), inventoryGroups:inventoryGroups(tables), tables};
 }
 
 export function validateState(input) {
@@ -37,8 +38,9 @@ export function validateState(input) {
 
 export async function stateWorkbook(state) {
   const book = new ExcelJS.Workbook();
+  await book.xlsx.load(await categoryWorkbook(state.tables));
   book.creator = 'Mahzaidex Tech / Hasnain Zaidi';
-  for (const name of modelNames) {
+  for (const name of ['customFieldDefinition','appSetting']) {
     const rows = name==='appSetting' ? state.tables[name].filter(r=>!r.key.startsWith('__') && !/api.?key|secret|token/i.test(r.key)) : state.tables[name];
     const fields = Object.keys(schemas[name].element.shape).filter(k => k !== 'passwordHash');
     const sheet = book.addWorksheet(name);

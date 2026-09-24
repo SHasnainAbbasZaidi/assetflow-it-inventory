@@ -23,7 +23,7 @@ Follow [INSTALLATION.md](INSTALLATION.md). The production web/API server uses No
 - [Security and AI credentials](SECURITY.md)
 - [Release notes](CHANGELOG.md)
 
-Reports and destructive administration features require an active administrator. All signed-in users can manage their own AI keys in Settings. Excel import is administrator-only because workbooks can contain user accounts. The Excel data exchange uses the Workstations, Peripherals, Users and Audit Logs sheets; full-state restore uses JSON backups, not the exchange workbook.
+Reports and destructive administration features require an active administrator. All signed-in users can manage their own AI keys in Settings. Excel import is administrator-only because workbooks can contain user accounts. Excel now uses Workstations, Peripherals, Devices, Components, Personnel, Users and Audit Logs sheets. Older four-sheet imports remain supported. Full-state restore uses JSON backups, not the exchange workbook.
 
 ## Verification
 

@@ -26,16 +26,17 @@ class _DashboardViewState extends State<DashboardView> {
     final provider = context.watch<InventoryProvider>();
     final assets = provider.assets;
     String category(Asset a) => HardwareGroups.classify(a.category, workstation: provider.workstations.contains(a));
-    final filtered = assets.where((a) => category(a) == group && (status.isEmpty || a.status == status) && '${a.id} ${a.category} ${a.assignee} ${a.customFields}'.toLowerCase().contains(query.toLowerCase())).toList();
+    final categoryAssets = assets.where((a) => category(a) == group).toList();
+    final filtered = categoryAssets.where((a) => (status.isEmpty || a.status == status) && '${a.id} ${a.category} ${a.assignee} ${a.customFields}'.toLowerCase().contains(query.toLowerCase())).toList();
     return Scaffold(backgroundColor: Colors.transparent, body: LayoutBuilder(builder: (context, constraints) {
       final narrow = constraints.maxWidth < 600;
       return ListView(padding: EdgeInsets.all(narrow ? 16 : 28), children: [
-        Text('Inventory Dashboard', style: Theme.of(context).textTheme.headlineSmall),
+        Text(group, style: Theme.of(context).textTheme.headlineSmall),
         const SizedBox(height: 6),
-        const Text('Every item, organized by hardware category'),
+        Text('Search, edit and print tags for ${group.toLowerCase()}'),
         const SizedBox(height: 22),
         Wrap(spacing: 12, runSpacing: 12, children: [
-          for (final entry in {'Total inventory': assets.length, 'Assigned': assets.where((a) => a.status == 'Assigned').length, 'In store': assets.where((a) => a.status == 'In Store').length, 'Scrapped': assets.where((a) => a.status == 'Scrapped').length}.entries)
+          for (final entry in {'Total items': categoryAssets.length, 'Assigned': categoryAssets.where((a) => a.status == 'Assigned').length, 'In store': categoryAssets.where((a) => a.status == 'In Store').length, 'Scrapped': categoryAssets.where((a) => a.status == 'Scrapped').length}.entries)
             SizedBox(width: (constraints.maxWidth - (narrow ? 44 : 92)) / (narrow ? 2 : 4), child: Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(entry.key), const SizedBox(height: 8), Text('${entry.value}', style: Theme.of(context).textTheme.headlineMedium)])))),
         ]),
         const SizedBox(height: 20),

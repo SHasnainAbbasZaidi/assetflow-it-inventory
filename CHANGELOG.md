@@ -1,5 +1,11 @@
 # Release notes
 
+## Unreleased
+
+- Separate the overall Dashboard from category management views on web and mobile. Refine the web overview with summary cards, hardware distribution, lifecycle chart and activity panels.
+- Align Excel exports and daily Excel backups with the four hardware categories; include personnel and preserve identifiers, assignments, specifications and custom fields on import.
+- Validate current-format workbook imports atomically, retain legacy four-sheet support, and include a derived category index in full-state backups without breaking older restores.
+
 ## 1.2.0 — 2026-09-24
 
 - Organize the web and Android inventory dashboards into Workstations, Peripherals, Devices and Components, with matching category counts, search, status filters and item actions. Existing records and tag identifiers stay in their original database tables.

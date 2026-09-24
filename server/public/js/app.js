@@ -271,7 +271,7 @@ function switchTab(tab) {
     if (!container) return;
     if (dataLoadError && !['settings'].includes(tab)) { container.innerHTML = '<div class="settings-pane"><h2>Data could not be loaded</h2><p>Your records have not been replaced. Check the server connection and database status.</p><button class="btn btn-primary" onclick="loadAllData().then(() => switchTab(currentTab))">Retry</button></div>'; return; }
 
-    if (tab === 'dashboard') renderHardwareDashboard(container);
+    if (tab === 'dashboard') renderInventoryOverview(container);
     else if (tab === 'devices') renderHardwareDashboard(container, 'Devices');
     else if (tab === 'components') renderHardwareDashboard(container, 'Components');
     else if (tab === 'workstations') renderHardwareDashboard(container, 'Workstations');
@@ -408,7 +408,7 @@ function renderDashboard(container) {
                         <i class="ph ph-file-xls" style="font-size: 24px; color: #f59e0b;"></i>
                         <div style="text-align: left;">
                             <div style="font-weight: 600;">Excel Tools</div>
-                            <div style="font-size: 11px; color: var(--text-muted);">Import or Export 4-sheet database</div>
+                            <div style="font-size: 11px; color: var(--text-muted);">Import or export category workbook</div>
                         </div>
                     </button>
                 </div>
@@ -1534,7 +1534,7 @@ function renderExcelTools(container) {
         <div class="page-header">
             <div class="page-title">
                 <h1>Excel Database Tools</h1>
-                <p>Import and export full database sheets (Workstations, Peripherals, Users, Audit Logs)</p>
+                <p>Import and export category sheets with personnel, account and audit records</p>
             </div>
         </div>
 
@@ -1545,7 +1545,7 @@ function renderExcelTools(container) {
                         <i class="ph ph-file-arrow-up" style="color: var(--accent);"></i> Import Excel Database
                     </h3>
                     <p style="font-size: 13px; color: var(--text-secondary); margin-top: 6px;">
-                        Upload a multi-sheet .xlsx workbook containing <strong>Workstations</strong>, <strong>Peripherals</strong>, <strong>Users</strong>, and <strong>Audit Logs</strong>. Valid rows are upserted.
+                        Upload the current seven-sheet workbook: <strong>Workstations, Peripherals, Devices, Components, Personnel, Users, and Audit Logs</strong>. Current-format imports validate and commit together. Older four-sheet files remain supported. Use Settings - Backup and Restore for complete application recovery.
                     </p>
                 </div>
 
@@ -1567,18 +1567,18 @@ function renderExcelTools(container) {
             <div class="glass-panel" style="padding: 32px; display: flex; flex-direction: column; gap: 20px; justify-content: space-between;">
                 <div>
                     <h3 style="display: flex; align-items: center; gap: 10px; font-size: 18px;">
-                        <i class="ph ph-file-arrow-down" style="color: #10b981;"></i> Export Complete Database
+                        <i class="ph ph-file-arrow-down" style="color: #10b981;"></i> Export Inventory Workbook
                     </h3>
                     <p style="font-size: 13px; color: var(--text-secondary); margin-top: 6px;">
-                        Download a clean, structured .xlsx spreadsheet with exact sheet headers and complete data for Workstations, Peripherals, Users, and Audit Logs.
+                        Download category sheets with assignments, specifications and custom fields. Passwords, API keys, settings and saved reports are preserved by full-state backups, not Excel exports.
                     </p>
                 </div>
 
                 <div style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-subtle); border-radius: 12px; padding: 20px; font-size: 13px; display: flex; flex-direction: column; gap: 8px;">
-                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 1:</strong> Workstations (13 columns)</div>
-                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 2:</strong> Peripherals (11 columns)</div>
-                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 3:</strong> Users (4 columns)</div>
-                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 4:</strong> Audit Logs (5 columns)</div>
+                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 1:</strong> Workstations - PCs and motherboard items</div>
+                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheet 2:</strong> Peripherals - accessories</div>
+                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheets 3-4:</strong> Devices and Components</div>
+                    <div><i class="ph ph-check" style="color: #10b981; margin-right: 6px;"></i> <strong>Sheets 5-7:</strong> Personnel, Users and Audit Logs</div>
                 </div>
 
                 <button class="btn btn-primary" style="background: #10b981; border-color: #059669; justify-content: center; width: 100%;" onclick="exportExcel()">

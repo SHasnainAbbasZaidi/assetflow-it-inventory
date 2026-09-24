@@ -40,7 +40,11 @@ void main() {
     final capture=GlobalKey();
     await tester.pumpWidget(MultiProvider(providers:[ChangeNotifierProvider.value(value:auth),ChangeNotifierProvider<InventoryProvider>(create:(_)=>DemoInventory())],child:Builder(builder:(context){final app=const AssetFlowApp().build(context) as MaterialApp;return MaterialApp(theme:app.darkTheme,home:RepaintBoundary(key:capture,child:const MainLayout()));})));
     await tester.pumpAndSettle();expect(tester.takeException(),isNull);
-    expect(find.text('Inventory Dashboard'),findsOneWidget);
+    expect(find.text('Dashboard Overview'),findsOneWidget);
+    expect(find.byType(ChoiceChip),findsNothing);
+    await tester.tap(find.text('Computers'));await tester.pumpAndSettle();
+    expect(find.text('Dashboard Overview'),findsNothing);
+    expect(find.text('Search, edit and print tags for workstations'),findsOneWidget);
     final out=Platform.environment['ASSETFLOW_SCREENSHOTS'];
     if(out!=null) {await tester.runAsync(() async {final boundary=capture.currentContext!.findRenderObject() as RenderRepaintBoundary;final image=await boundary.toImage(pixelRatio:2);final bytes=await image.toByteData(format:ui.ImageByteFormat.png);await Directory(out).create(recursive:true);await File('$out/mobile-dashboard.png').writeAsBytes(bytes!.buffer.asUint8List());image.dispose();});}
     await tester.ensureVisible(find.widgetWithText(ChoiceChip,'Devices  2'));await tester.tap(find.widgetWithText(ChoiceChip,'Devices  2'));await tester.pumpAndSettle();expect(tester.takeException(),isNull);

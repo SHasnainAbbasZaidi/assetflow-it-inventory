@@ -1,3 +1,4 @@
+import {hardwareGroup} from './hardware-workbook.js';
 // AssetFlow | Mahzaidex Tech | Developed by Hasnain Zaidi
 import express from 'express';
 import {scrapRoutes} from './scrap-service.js';
@@ -36,8 +37,8 @@ export function adminTools(prisma, backups) {
       rows=await prisma.auditLog.findMany({where,orderBy:{timestamp:'desc'}});
     } else if(type==='users') rows=await prisma.appUser.findMany({select:{email:true,fullName:true,role:true,status:true,createdAt:true}});
     else {
-      rows=[...ws.map(a=>({tag:a.workstationTag,type:'Workstation',description:a.deviceType||'',status:a.status,person:a.personnel?.fullName||a.userName||'',personnelId:a.personnelId||'',department:a.personnel?.department||'',workstation:'',quantity:1,warrantyExpiry:null})),
-        ...per.map(a=>{const owner=a.personnel||a.workstation?.personnel;return {tag:a.peripheralTag,type:'Peripheral',description:[a.category,a.modelSpecs].filter(Boolean).join(' / '),status:a.status,person:owner?.fullName||'',personnelId:owner?.id||'',department:owner?.department||'',workstation:a.workstationTag||'',quantity:a.quantity,warrantyExpiry:a.warrantyExpiry};})];
+      rows=[...ws.map(a=>({tag:a.workstationTag,type:'Workstation',categoryGroup:'Workstations',description:a.deviceType||'',status:a.status,person:a.personnel?.fullName||a.userName||'',personnelId:a.personnelId||'',department:a.personnel?.department||'',workstation:'',quantity:1,warrantyExpiry:null})),
+        ...per.map(a=>{const owner=a.personnel||a.workstation?.personnel;return {tag:a.peripheralTag,type:'Peripheral',categoryGroup:hardwareGroup(a.category),description:[a.category,a.modelSpecs].filter(Boolean).join(' / '),status:a.status,person:owner?.fullName||'',personnelId:owner?.id||'',department:owner?.department||'',workstation:a.workstationTag||'',quantity:a.quantity,warrantyExpiry:a.warrantyExpiry};})];
       if(type==='personnel') {
         const assigned=new Set(rows.map(r=>r.personnelId));
         rows=rows.filter(r=>r.personnelId);

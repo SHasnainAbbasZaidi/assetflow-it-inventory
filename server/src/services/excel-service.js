@@ -1,3 +1,5 @@
+import {categoryWorkbook,importCategoryWorkbook} from './hardware-workbook.js';
+import {httpError} from '../middleware/errors.js';
 import ExcelJS from 'exceljs';
 import {registerScrapped} from './scrap-service.js';
 
@@ -43,6 +45,10 @@ function assertHeaders(sheet, expected) {
 export async function importWorkbook(buffer, prisma, operator) {
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
+  if(workbook.getWorksheet('Workstations')?.getRow(1).getCell(1).value==='Record Type') {
+    try {return await importCategoryWorkbook(workbook,prisma,operator);}
+    catch(error){throw httpError(400,error.code?'Workbook contains invalid values or references missing records. No rows were changed.':error.message);}
+  }
   for (const [name, headers] of Object.entries(SHEETS)) {
     const sheet = workbook.getWorksheet(name);
     if (!sheet) throw new Error(`Missing required sheet: ${name}`);
@@ -125,12 +131,7 @@ function addSheet(workbook, name, headers, rows) {
   return sheet;
 }
 export async function exportWorkbook(prisma) {
-  const [workstations, peripherals, users, logs] = await Promise.all([prisma.workstation.findMany({ orderBy: { workstationTag: 'asc' } }), prisma.peripheral.findMany({ orderBy: { peripheralTag: 'asc' } }), prisma.appUser.findMany({ orderBy: { email: 'asc' } }), prisma.auditLog.findMany({ orderBy: { timestamp: 'asc' } })]);
-  const book = new ExcelJS.Workbook(); book.creator = 'AssetFlow';
-  addSheet(book, 'Workstations', SHEETS.Workstations, workstations.map(x => [x.workstationTag, x.userName, x.deviceType, x.motherboard, x.processorGen, x.ram, x.ssd, x.hdd, x.gpu, statusLabel(x.status), x.assignedDate, x.pdfFile, x.notes]));
-  addSheet(book, 'Peripherals', SHEETS.Peripherals, peripherals.map(x => [x.peripheralTag, x.category, x.modelSpecs, x.workstationTag, statusLabel(x.status), x.purchaseDate, x.warrantyExpiry, x.brandManufacturer, x.quantity, x.storageCapacity, x.gpuSpecs]));
-  addSheet(book, 'Users', SHEETS.Users, users.map(x => [x.email, x.fullName, x.role, x.status]));
-  addSheet(book, 'Audit Logs', SHEETS['Audit Logs'], logs.map(x => [x.logId, x.timestamp, x.userEmail, x.assetTag, x.actionTaken]));
-  for (const sheet of book.worksheets) sheet.eachRow((row, number) => { if (number > 1) row.eachCell(cell => { if (cell.value instanceof Date) cell.numFmt = 'yyyy-mm-dd'; }); });
-  return book.xlsx.writeBuffer();
+  const names=['workstation','peripheral','personnel','appUser','auditLog'];
+  const rows=await prisma.$transaction(names.map(name=>prisma[name].findMany()));
+  return categoryWorkbook(Object.fromEntries(names.map((name,i)=>[name,rows[i]])));
 }
