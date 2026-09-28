@@ -10,6 +10,7 @@ export function adminTools(prisma, backups) {
   const router = express.Router();
   router.use(async(req,res,next)=>{
     const user = await prisma.appUser.findUnique({where:{email:req.auth.email}});
+    if(user?.status==='ACTIVE' && req.method==='GET' && req.path==='/reports' && req.auth.permissions?.reports && (req.query.format!=='xlsx'||req.auth.permissions?.export))return next();
     if (user?.role !== 'ADMIN' || user.status !== 'ACTIVE') throw httpError(403,'Administrator access required.');
     next();
   });

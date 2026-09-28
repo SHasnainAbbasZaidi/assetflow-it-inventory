@@ -67,7 +67,11 @@ class _AdminToolsViewState extends State<AdminToolsView> {
   }
 
   Future<void> run(Future<void> Function() task) async {
-    if (busy || !(context.read<AuthProvider>().currentUser?.isAdmin ?? false))
+    if (busy ||
+        !(widget.mode == 'reports'
+            ? (context.read<AuthProvider>().currentUser?.can('reports') ??
+                false)
+            : (context.read<AuthProvider>().currentUser?.isAdmin ?? false)))
       return;
     setState(() {
       busy = true;
@@ -202,10 +206,11 @@ class _AdminToolsViewState extends State<AdminToolsView> {
   }
 
   List<Widget> reportWidgets() => [
-        OutlinedButton(
-            onPressed: () => Navigator.push(context,
-                MaterialPageRoute(builder: (_) => const ScrapReportView())),
-            child: const Text('Scrap Items Report')),
+        if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+          OutlinedButton(
+              onPressed: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ScrapReportView())),
+              child: const Text('Scrap Items Report')),
         const Text('Reports',
             style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         const SizedBox(height: 16),
@@ -254,7 +259,8 @@ class _AdminToolsViewState extends State<AdminToolsView> {
         ],
         Wrap(spacing: 12, children: [
           button('Generate report', () => generate(false)),
-          button('Download Excel', () => generate(true))
+          if (context.watch<AuthProvider>().currentUser?.can('export') ?? false)
+            button('Download Excel', () => generate(true))
         ]),
         if (report != null) ...[
           Text('${report!['total']} records (preview up to 500)'),
@@ -382,7 +388,9 @@ class _AdminToolsViewState extends State<AdminToolsView> {
       ];
   @override
   Widget build(BuildContext context) {
-    if (!(context.watch<AuthProvider>().currentUser?.isAdmin ?? false))
+    if (!(widget.mode == 'reports'
+        ? (context.watch<AuthProvider>().currentUser?.can('reports') ?? false)
+        : (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)))
       return const SizedBox.shrink();
     final children = <Widget>[
       if (busy) const LinearProgressIndicator(),

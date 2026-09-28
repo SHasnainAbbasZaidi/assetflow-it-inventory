@@ -41,8 +41,10 @@ class AuthProvider extends ChangeNotifier {
   Future<void> login(String serverUrl, String email, String password) async {
     final cleanUrl = AssetApiService.normalizeUrl(serverUrl);
     _apiToken = await AssetApiService.login(cleanUrl, email, password);
+    _currentUser =
+        User.fromApi(await AssetApiService(token: _apiToken!).getProfile());
     _serverUrl = cleanUrl;
-    
+
     final box = await Hive.openBox('settings');
     await box.put('serverUrl', _serverUrl);
     notifyListeners();

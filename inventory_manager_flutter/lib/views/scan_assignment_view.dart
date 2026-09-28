@@ -4,7 +4,7 @@ import 'package:inventory_manager_flutter/services/asset_api_service.dart';
 import 'package:inventory_manager_flutter/services/database_service.dart';
 import 'package:inventory_manager_flutter/providers/auth_provider.dart';
 import 'package:inventory_manager_flutter/utils/scan_payload.dart';
-import 'package:mobile_scanner/mobile_scanner.dart';
+import '../widgets/asset_camera.dart';
 
 class ScanAssignmentView extends StatefulWidget {
   const ScanAssignmentView({super.key});
@@ -14,13 +14,11 @@ class ScanAssignmentView extends StatefulWidget {
 
 class _ScanAssignmentViewState extends State<ScanAssignmentView> {
   final _input = TextEditingController();
-  final _camera = MobileScannerController();
   bool _busy = false, _paused = false;
   String? _error, _last;
   @override
   void dispose() {
     _input.dispose();
-    _camera.dispose();
     super.dispose();
   }
 
@@ -33,9 +31,6 @@ class _ScanAssignmentViewState extends State<ScanAssignmentView> {
       _last = code;
     });
     try {
-      try {
-        await _camera.stop();
-      } catch (_) {}
       final tag = parseScanPayload(code);
       if (!mounted) return;
       final token = context.read<AuthProvider>().apiToken;
@@ -67,18 +62,10 @@ class _ScanAssignmentViewState extends State<ScanAssignmentView> {
   }
 
   Future<void> _resume() async {
-    try {
-      await _camera.start();
-      if (mounted)
-        setState(() {
-          _paused = false;
-          _error = null;
-        });
-    } catch (_) {
-      if (mounted)
-        setState(() => _error =
-            'Camera unavailable. Enable camera permission in device settings or use manual entry.');
-    }
+    setState(() {
+      _paused = false;
+      _error = null;
+    });
   }
 
   @override
@@ -95,24 +82,11 @@ class _ScanAssignmentViewState extends State<ScanAssignmentView> {
                 borderRadius: BorderRadius.circular(20),
                 child: SizedBox(
                     height: 260,
-                    child: MobileScanner(
-                        controller: _camera,
-                        onDetect: (capture) {
-                          if (!_paused && !_busy) {
-                            final code = capture.barcodes.firstOrNull?.rawValue;
-                            if (code != null) _scan(code);
-                          }
-                        },
-                        errorBuilder: (_, error, __) => Center(
-                            child: Padding(
-                                padding: const EdgeInsets.all(20),
-                                child: Text(
-                                    error.errorCode ==
-                                            MobileScannerErrorCode
-                                                .permissionDenied
-                                        ? 'Camera permission denied. Enable it in device settings or enter the tag below.'
-                                        : 'Camera unavailable. Retry or enter the tag below.',
-                                    textAlign: TextAlign.center)))))),
+                    child: AssetCamera(
+                        active: !_paused,
+                        onCode: (code) {
+                          if (!_busy && !_paused) _scan(code);
+                        }))),
             if (_busy)
               const Padding(
                   padding: EdgeInsets.all(16),
@@ -249,7 +223,9 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
             .contains(_query.trim().toLowerCase()))
         .take(30)
         .toList();
-    final blocked = ['RETIRED', 'OUT_OF_ORDER'].contains(item['status']);
+    final blocked =
+        ['RETIRED', 'OUT_OF_ORDER', 'SCRAPPED'].contains(item['status']) ||
+            !(context.watch<AuthProvider>().currentUser?.can('edit') ?? false);
     return PopScope(
         canPop: !_saving,
         child: AlertDialog(

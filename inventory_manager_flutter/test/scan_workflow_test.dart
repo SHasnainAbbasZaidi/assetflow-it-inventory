@@ -1,3 +1,4 @@
+import 'package:inventory_manager_flutter/providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
@@ -8,7 +9,8 @@ import 'package:inventory_manager_flutter/views/dashboard_view.dart';
 void main() {
   test('scans preserve case and support both existing QR formats', () {
     expect(parseScanPayload('  Ws-001  '), 'Ws-001');
-    expect(parseScanPayload('{"tagNumber":"PER-12","assetId":"other"}'), 'PER-12');
+    expect(
+        parseScanPayload('{"tagNumber":"PER-12","assetId":"other"}'), 'PER-12');
     expect(parseScanPayload('{"assetId":"WS-9"}'), 'WS-9');
   });
   test('damaged, empty and unrelated QR payloads are rejected', () {
@@ -21,7 +23,10 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(ChangeNotifierProvider(create: (_) => InventoryProvider(), child: const MaterialApp(home: DashboardView())));
+    await tester.pumpWidget(MultiProvider(providers: [
+      ChangeNotifierProvider(create: (_) => InventoryProvider()),
+      ChangeNotifierProvider(create: (_) => AuthProvider())
+    ], child: const MaterialApp(home: DashboardView())));
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });

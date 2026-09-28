@@ -294,6 +294,8 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
   late String _department;
   late String _password;
   late bool _isAdmin;
+  bool _customAccess = false;
+  Map<String, bool> _permissions = {};
   bool _obscurePassword = true;
 
   @override
@@ -301,7 +303,14 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
     super.initState();
     _name = widget.user?.name ?? '';
     _email = widget.user?.email ?? '';
-    _department = widget.user?.department ?? '';
+    _department = ['EDITOR', 'VIEWER'].contains(widget.user?.department)
+        ? widget.user!.department
+        : 'VIEWER';
+    _customAccess = widget.user?.customPermissions != null;
+    _permissions = {
+      for (final k in User.accessLabels.keys)
+        k: widget.user?.can(k) ?? ['view', 'export'].contains(k)
+    };
     _password = '';
     _isAdmin = widget.user?.isAdmin ?? false;
   }
@@ -317,7 +326,8 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
         width: 420,
         child: Form(
           key: _formKey,
-          child: Column(
+          child: SingleChildScrollView(
+              child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextFormField(
@@ -334,6 +344,7 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
               const SizedBox(height: 14),
               TextFormField(
                 initialValue: _email,
+                enabled: !isEdit,
                 decoration: const InputDecoration(
                   labelText: 'Email Address',
                   hintText: 'john@company.com',
@@ -349,17 +360,14 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
                 onSaved: (v) => _email = v!.trim(),
               ),
               const SizedBox(height: 14),
-              TextFormField(
-                initialValue: _department,
-                decoration: const InputDecoration(
-                  labelText: 'Department',
-                  hintText: 'e.g. IT',
-                  prefixIcon: Icon(Icons.business_outlined),
-                ),
-                validator: (v) =>
-                    v == null || v.trim().isEmpty ? 'Required' : null,
-                onSaved: (v) => _department = v!.trim(),
-              ),
+              DropdownButtonFormField<String>(
+                  initialValue: _department,
+                  decoration: const InputDecoration(labelText: 'Base role'),
+                  items: const [
+                    DropdownMenuItem(value: 'EDITOR', child: Text('Editor')),
+                    DropdownMenuItem(value: 'VIEWER', child: Text('Viewer'))
+                  ],
+                  onChanged: (value) => setState(() => _department = value!)),
               const SizedBox(height: 14),
               TextFormField(
                 decoration: InputDecoration(
@@ -420,8 +428,22 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
                   ],
                 ),
               ),
+              if (!_isAdmin) ...[
+                SwitchListTile(
+                    title: const Text('Individual permissions'),
+                    value: _customAccess,
+                    onChanged: (v) => setState(() => _customAccess = v)),
+                if (_customAccess)
+                  ...User.accessLabels.entries.map((e) => CheckboxListTile(
+                      title: Text(e.value),
+                      value: _permissions[e.key],
+                      onChanged: (v) =>
+                          setState(() => _permissions[e.key] = v!))),
+              ],
+              const Text(
+                  'Restore, backups, account management, scrapping and permanent inventory deletion are administrator-only.'),
             ],
-          ),
+          )),
         ),
       ),
       actions: [
@@ -433,27 +455,35 @@ class _AppUserFormDialogState extends State<AppUserFormDialog> {
           onPressed: () async {
             if (_formKey.currentState!.validate()) {
               _formKey.currentState!.save();
-              if (isEdit) {
-                final finalPassword =
-                    _password.isEmpty ? widget.user!.password : _password;
-                await provider.updateAppUser(
-                  widget.user!.id,
-                  name: _name,
-                  email: _email,
-                  department: _department,
-                  password: finalPassword,
-                  isAdmin: _isAdmin,
-                );
-              } else {
-                await provider.addUser(
-                  name: _name,
-                  email: _email,
-                  department: _department,
-                  password: _password,
-                  isAdmin: _isAdmin,
-                );
+              try {
+                if (isEdit) {
+                  final finalPassword =
+                      _password.isEmpty ? widget.user!.password : _password;
+                  await provider.updateAppUser(
+                    widget.user!.id,
+                    name: _name,
+                    email: _email,
+                    department: _department,
+                    password: finalPassword,
+                    isAdmin: _isAdmin,
+                    customPermissions: _customAccess ? _permissions : null,
+                  );
+                } else {
+                  await provider.addUser(
+                    name: _name,
+                    email: _email,
+                    department: _department,
+                    password: _password,
+                    isAdmin: _isAdmin,
+                    customPermissions: _customAccess ? _permissions : null,
+                  );
+                }
+                if (context.mounted) Navigator.pop(context);
+              } catch (error) {
+                if (context.mounted)
+                  ScaffoldMessenger.of(context)
+                      .showSnackBar(SnackBar(content: Text(error.toString())));
               }
-              Navigator.pop(context);
             }
           },
           child: Text(isEdit ? 'Save Changes' : 'Create User'),

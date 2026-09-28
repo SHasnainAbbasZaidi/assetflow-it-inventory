@@ -14,11 +14,11 @@ The script generates all Android launcher densities and builds the APK without n
 
 The script also works around Windows JDK temporary socket-path failures with a workspace-local socket directory. It replaces `server/public/download/app-release.apk` only after a successful release build.
 
-The version is in `pubspec.yaml`; version 1.2.0+3 means display version 1.2.0 and Android version code 3. Keep the existing application ID (`com.assetflow.inventory_manager_flutter`) and signing key when updating installed copies. The current project uses its established debug keystore for compatibility; protect it and plan any signing-key change separately.
+The version is in `pubspec.yaml`; version 1.2.1+4 means display version 1.2.1 and Android version code 4. Keep the existing application ID (`com.assetflow.inventory_manager_flutter`) and signing key when updating installed copies. The current project uses its established debug keystore for compatibility; protect it and plan any signing-key change separately.
 
 ## Features and checks
 
-Reports and Settings-only destructive controls require an administrator. Personal AI keys are managed through the server; no provider key is persisted in the APK or local settings. Scrap reports support batch tags, immutable report history, Excel export and printable PDF download.
+Administrators can grant individual report access in Settings → Users & Access. Restore, backups, scrapping, user management and permanent inventory deletion always require an administrator. Personal AI keys are managed through the server; no provider key is persisted in the APK or local settings. Scrap reports support batch tags, immutable report history, Excel export and printable PDF download.
 
 ```sh
 flutter pub get
@@ -28,3 +28,5 @@ flutter build apk --release
 ```
 
 The last command uses the already-generated launcher icons. Use the PowerShell script for the default QR icon or an explicit logo override. Install the APK as an update rather than uninstalling the existing app. Configure the self-hosted HTTPS server address before signing in.
+
+Camera permission denial has a Retry camera action. The scanner resumes with the app and pauses during assignment. Camera lifecycle tests use a simulated camera; confirm scanning on the target Android device before deploying widely. Keep the existing Server URL, Username and Password login flow.

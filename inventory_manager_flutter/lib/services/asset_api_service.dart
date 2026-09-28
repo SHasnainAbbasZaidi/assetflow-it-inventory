@@ -10,7 +10,8 @@ class AssetApiService {
     }
   }
 
-  static String baseUrl = const String.fromEnvironment('ASSET_API_URL', defaultValue: '');
+  static String baseUrl =
+      const String.fromEnvironment('ASSET_API_URL', defaultValue: '');
   final String token;
   final http.Client _client;
 
@@ -38,43 +39,59 @@ class AssetApiService {
     }
   }
 
-  static Future<String> login(String serverUrl, String email, String password) async {
+  static Future<String> login(
+      String serverUrl, String email, String password) async {
     final cleanUrl = normalizeUrl(serverUrl);
     baseUrl = cleanUrl;
-    
+
     final response = await http.post(
       Uri.parse('$baseUrl/api/auth/login'),
-      headers: const {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: const {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: jsonEncode({'email': email, 'password': password}),
     );
-    final body = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body) as Map<String, dynamic>;
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode != 200 || body['token'] is! String) {
-      throw AssetApiException((body['error'] as Map?)?['message']?.toString() ?? 'Server sign-in failed.');
+      throw AssetApiException((body['error'] as Map?)?['message']?.toString() ??
+          'Server sign-in failed.');
     }
     return body['token'] as String;
   }
 
+  Future<Map<String, dynamic>> getProfile() async =>
+      Map<String, dynamic>.from(await _get('/api/auth/me'));
+
   Future<AssetLookup> lookup(String tag) async {
-    if (baseUrl.isEmpty) throw const AssetApiException('The Server URL is not configured.');
+    if (baseUrl.isEmpty)
+      throw const AssetApiException('The Server URL is not configured.');
     final response = await _client.get(
       Uri.parse('$baseUrl/api/assets/lookup/${Uri.encodeComponent(tag)}'),
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
     );
-    final body = response.body.isEmpty ? <String, dynamic>{} : jsonDecode(response.body) as Map<String, dynamic>;
+    final body = response.body.isEmpty
+        ? <String, dynamic>{}
+        : jsonDecode(response.body) as Map<String, dynamic>;
     if (response.statusCode == 404) throw const AssetNotFoundException();
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw AssetApiException((body['error'] as Map?)?['message']?.toString() ?? 'Asset lookup failed.');
+      throw AssetApiException((body['error'] as Map?)?['message']?.toString() ??
+          'Asset lookup failed.');
     }
     final type = body['type']?.toString();
     final data = body['data'];
-    if ((type != 'workstation' && type != 'peripheral') || data is! Map<String, dynamic>) {
+    if ((type != 'workstation' && type != 'peripheral') ||
+        data is! Map<String, dynamic>) {
       throw const AssetApiException('Invalid lookup response.');
     }
     return AssetLookup(type: type!, data: data);
   }
 
   Future<dynamic> _get(String path) async {
-    if (baseUrl.isEmpty) throw const AssetApiException('The Server URL is not configured.');
+    if (baseUrl.isEmpty)
+      throw const AssetApiException('The Server URL is not configured.');
     final response = await _client.get(
       Uri.parse('$baseUrl$path'),
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
@@ -83,27 +100,38 @@ class AssetApiService {
   }
 
   Future<dynamic> _post(String path, [Map<String, dynamic>? data]) async {
-    if (baseUrl.isEmpty) throw const AssetApiException('The Server URL is not configured.');
+    if (baseUrl.isEmpty)
+      throw const AssetApiException('The Server URL is not configured.');
     final response = await _client.post(
       Uri.parse('$baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: data != null ? jsonEncode(data) : null,
     );
     return _processResponse(response);
   }
 
   Future<dynamic> _patch(String path, [Map<String, dynamic>? data]) async {
-    if (baseUrl.isEmpty) throw const AssetApiException('The Server URL is not configured.');
+    if (baseUrl.isEmpty)
+      throw const AssetApiException('The Server URL is not configured.');
     final response = await _client.patch(
       Uri.parse('$baseUrl$path'),
-      headers: {'Authorization': 'Bearer $token', 'Content-Type': 'application/json', 'Accept': 'application/json'},
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
       body: data != null ? jsonEncode(data) : null,
     );
     return _processResponse(response);
   }
 
   Future<dynamic> _delete(String path) async {
-    if (baseUrl.isEmpty) throw const AssetApiException('The Server URL is not configured.');
+    if (baseUrl.isEmpty)
+      throw const AssetApiException('The Server URL is not configured.');
     final response = await _client.delete(
       Uri.parse('$baseUrl$path'),
       headers: {'Authorization': 'Bearer $token', 'Accept': 'application/json'},
@@ -117,37 +145,76 @@ class AssetApiService {
     final body = response.body.isEmpty ? null : jsonDecode(response.body);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       if (response.statusCode == 404) throw const AssetNotFoundException();
-      final msg = (body is Map && body['error'] is Map) ? body['error']['message']?.toString() : null;
-      throw AssetApiException(msg ?? 'API request failed with status ${response.statusCode}.');
+      final msg = (body is Map && body['error'] is Map)
+          ? body['error']['message']?.toString()
+          : null;
+      throw AssetApiException(
+          msg ?? 'API request failed with status ${response.statusCode}.');
     }
     return body;
   }
 
-  Future<List<dynamic>> getWorkstations() async => await _get('/api/workstations') as List<dynamic>;
-  Future<List<dynamic>> getPeripherals() async => await _get('/api/peripherals') as List<dynamic>;
-  Future<List<dynamic>> getUsers() async => await _get('/api/users') as List<dynamic>;
-  Future<List<dynamic>> getLogs() async => await _get('/api/logs') as List<dynamic>;
-  Future<Map<String, dynamic>> getSettings() async => await _get('/api/settings') as Map<String, dynamic>;
-  Future<Map<String,dynamic>> assign(String kind,String tag,Map<String,dynamic> request) async => await _post('/api/assets/$kind/${Uri.encodeComponent(tag)}/assign',request) as Map<String,dynamic>;
+  Future<List<dynamic>> getWorkstations() async =>
+      await _get('/api/workstations') as List<dynamic>;
+  Future<List<dynamic>> getPeripherals() async =>
+      await _get('/api/peripherals') as List<dynamic>;
+  Future<List<dynamic>> getUsers() async =>
+      await _get('/api/users') as List<dynamic>;
+  Future<List<dynamic>> getLogs() async =>
+      await _get('/api/logs') as List<dynamic>;
+  Future<Map<String, dynamic>> getSettings() async =>
+      await _get('/api/settings') as Map<String, dynamic>;
+  Future<Map<String, dynamic>> assign(
+          String kind, String tag, Map<String, dynamic> request) async =>
+      await _post(
+              '/api/assets/$kind/${Uri.encodeComponent(tag)}/assign', request)
+          as Map<String, dynamic>;
 
-  Future<Map<String, dynamic>> createWorkstation(Map<String, dynamic> data) async => await _post('/api/workstations', data) as Map<String, dynamic>;
-  Future<Map<String, dynamic>> updateWorkstation(String tag, Map<String, dynamic> data) async => await _patch('/api/workstations/${Uri.encodeComponent(tag)}', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> createWorkstation(
+          Map<String, dynamic> data) async =>
+      await _post('/api/workstations', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> updateWorkstation(
+          String tag, Map<String, dynamic> data) async =>
+      await _patch('/api/workstations/${Uri.encodeComponent(tag)}', data)
+          as Map<String, dynamic>;
 
-  Future<Map<String, dynamic>> createPeripheral(Map<String, dynamic> data) async => await _post('/api/peripherals', data) as Map<String, dynamic>;
-  Future<Map<String, dynamic>> updatePeripheral(String tag, Map<String, dynamic> data) async => await _patch('/api/peripherals/${Uri.encodeComponent(tag)}', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> createPeripheral(
+          Map<String, dynamic> data) async =>
+      await _post('/api/peripherals', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> updatePeripheral(
+          String tag, Map<String, dynamic> data) async =>
+      await _patch('/api/peripherals/${Uri.encodeComponent(tag)}', data)
+          as Map<String, dynamic>;
 
-  Future<Map<String, dynamic>> createUser(Map<String, dynamic> data) async => await _post('/api/users', data) as Map<String, dynamic>;
-  Future<Map<String, dynamic>> updateUser(String email, Map<String, dynamic> data) async => await _patch('/api/users/${Uri.encodeComponent(email)}', data) as Map<String, dynamic>;
-  Future<void> deleteUser(String email) async => await _delete('/api/users/${Uri.encodeComponent(email)}');
+  Future<Map<String, dynamic>> createUser(Map<String, dynamic> data) async =>
+      await _post('/api/users', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> updateUser(
+          String email, Map<String, dynamic> data) async =>
+      await _patch('/api/users/${Uri.encodeComponent(email)}', data)
+          as Map<String, dynamic>;
+  Future<void> deleteUser(String email) async =>
+      await _delete('/api/users/${Uri.encodeComponent(email)}');
 
   // Personnel API (asset owners — NOT login accounts)
-  Future<List<dynamic>> getPersonnel() async => await _get('/api/personnel') as List<dynamic>;
-  Future<Map<String, dynamic>> getPersonnelById(String id) async => await _get('/api/personnel/${Uri.encodeComponent(id)}') as Map<String, dynamic>;
-  Future<Map<String, dynamic>> createPersonnel(Map<String, dynamic> data) async => await _post('/api/personnel', data) as Map<String, dynamic>;
-  Future<Map<String, dynamic>> updatePersonnel(String id, Map<String, dynamic> data) async => await _patch('/api/personnel/${Uri.encodeComponent(id)}', data) as Map<String, dynamic>;
-  Future<void> deletePersonnel(String id) async => await _delete('/api/personnel/${Uri.encodeComponent(id)}');
+  Future<List<dynamic>> getPersonnel() async =>
+      await _get('/api/personnel') as List<dynamic>;
+  Future<Map<String, dynamic>> getPersonnelById(String id) async =>
+      await _get('/api/personnel/${Uri.encodeComponent(id)}')
+          as Map<String, dynamic>;
+  Future<Map<String, dynamic>> createPersonnel(
+          Map<String, dynamic> data) async =>
+      await _post('/api/personnel', data) as Map<String, dynamic>;
+  Future<Map<String, dynamic>> updatePersonnel(
+          String id, Map<String, dynamic> data) async =>
+      await _patch('/api/personnel/${Uri.encodeComponent(id)}', data)
+          as Map<String, dynamic>;
+  Future<void> deletePersonnel(String id) async =>
+      await _delete('/api/personnel/${Uri.encodeComponent(id)}');
 
-  Future<void> updateAssetStatus(String kind, String tag, String status) async => await _patch('/api/assets/$kind/${Uri.encodeComponent(tag)}/status', {'status': status});
+  Future<void> updateAssetStatus(
+          String kind, String tag, String status) async =>
+      await _patch('/api/assets/$kind/${Uri.encodeComponent(tag)}/status',
+          {'status': status});
 }
 
 class AssetLookup {

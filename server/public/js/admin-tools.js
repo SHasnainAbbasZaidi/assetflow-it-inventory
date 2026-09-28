@@ -9,30 +9,31 @@ const AdminTools = (() => {
     const blob=await response.blob(),link=document.createElement('a'),objectUrl=URL.createObjectURL(blob);
     link.href=objectUrl;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(objectUrl),1000);
   }
-  async function action(fn) {
-    if(!allowed()||busy)return;
+  async function action(fn, reportOnly=false) {
+    if(!(reportOnly?canAccess('reports'):allowed())||busy)return;
     busy=true;document.querySelectorAll('.admin-action').forEach(b=>b.disabled=true);
     try {await fn();} catch(e){showToast(e.message,'error');}
     finally {busy=false;document.querySelectorAll('.admin-action').forEach(b=>b.disabled=false);}
   }
   function reports(container) {
-    if(!allowed())return;
-    container.innerHTML=`<div class="page-header"><div class="page-title"><h1>Reports</h1><button class="btn btn-secondary" onclick="ScrapTools.open()">Scrap Items Report</button><p>Generate current inventory and administration records.</p></div></div>
+    if(!canAccess('reports'))return;
+    container.innerHTML=`<div class="page-header"><div class="page-title"><h1>Reports</h1>${allowed()?'<button class="btn btn-secondary" onclick="ScrapTools.open()">Scrap Items Report</button>':''}<p>Generate current inventory and administration records.</p></div></div>
     <section class="settings-pane"><div class="admin-form-grid">
     <label>Report<select id="reportType">${types.map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>
     <label>Asset status<select id="reportStatus"><option value="">All statuses</option>${['IN_STORE','ASSIGNED','RETIRED','OUT_OF_ORDER','SCRAPPED'].map(s=>`<option>${s}</option>`).join('')}</select></label>
     <label>Person<select id="reportPerson"><option value="">Everyone</option>${data.personnel.map(p=>`<option value="${escapeHtml(p.id)}">${escapeHtml(p.fullName)}</option>`).join('')}</select></label>
     <label>Audit records from<input type="date" id="reportFrom"></label><label>Audit records through<input type="date" id="reportTo"></label></div>
-    <div class="admin-actions"><button class="btn btn-primary admin-action" onclick="AdminTools.generate(false)">Generate report</button><button class="btn btn-secondary admin-action" onclick="AdminTools.generate(true)">Download Excel</button></div>
+    <div class="admin-actions"><button class="btn btn-primary admin-action" onclick="AdminTools.generate(false)">Generate report</button>${canAccess('export')?'<button class="btn btn-secondary admin-action" onclick="AdminTools.generate(true)">Download Excel</button>':''}</div>
     <p class="muted">Status and person filters apply to asset reports. Dates apply to audit records.</p><div id="reportPreview" aria-live="polite"></div></section>`;
   }
   function generate(exportFile) {return action(async()=>{
     const query=new URLSearchParams({type:document.getElementById('reportType').value,status:document.getElementById('reportStatus').value,personnelId:document.getElementById('reportPerson').value,from:document.getElementById('reportFrom').value,to:document.getElementById('reportTo').value});
+    if(exportFile && !canAccess('export'))throw Error('Excel export access is disabled.');
     if(exportFile) {query.set('format','xlsx');return download('/api/admin/reports?'+query,'assetflow-report.xlsx');}
     const report=await api('/api/admin/reports?'+query);
     const target=document.getElementById('reportPreview');if(!target)return;
     target.innerHTML=`<p>${report.total} records · ${escapeHtml(new Date(report.generatedAt).toLocaleString())}${report.total>500?' · Preview shows first 500; Excel includes all records.':''}</p><div class="table-container"><table><thead><tr>${report.columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${report.rows.map(row=>`<tr>${report.columns.map(c=>`<td>${escapeHtml(String(row[c]??''))}</td>`).join('')}</tr>`).join('')||`<tr><td colspan="${report.columns.length}">No matching records.</td></tr>`}</tbody></table></div>`;
-  });}
+  },true);}
   async function backups(pane) {
     if(!allowed())return;
     pane.innerHTML='<div class="settings-pane">Loading backups…</div>';

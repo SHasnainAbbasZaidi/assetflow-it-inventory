@@ -1,3 +1,4 @@
+import {userAccess,saveAccess,accessKey,requirePermission} from './services/access-service.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -111,7 +112,7 @@ async function requireAuth(req, res, next) {
     req.auth = jwt.verify(token, process.env.JWT_SECRET);
     const user = await prisma.appUser.findUnique({where:{email:req.auth.email}});
     if (!user || user.status !== 'ACTIVE') return next(httpError(401, 'Account is unavailable.', 'UNAUTHORIZED'));
-    req.auth = {...req.auth, role:user.role, fullName:user.fullName};
+    req.auth = {...req.auth, role:user.role, fullName:user.fullName,...await userAccess(prisma,user)};
     next();
   } catch {
     next(httpError(401, 'Invalid or expired token.', 'UNAUTHORIZED'));
@@ -153,17 +154,18 @@ function serializeCustomFields(cf) {
   return String(cf);
 }
 
-async function changeStatus(kind, tag, nextStatus, userEmail) {
+async function changeStatus(kind, tag, nextStatus, userEmail, role) {
   const model = kind === 'workstation' ? prisma.workstation : prisma.peripheral;
   const key = kind === 'workstation' ? 'workstationTag' : 'peripheralTag';
   const asset = await model.findUnique({ where: { [key]: tag } });
   if (!asset) throw httpError(404, `${kind} not found.`, 'ASSET_NOT_FOUND');
+  if(asset.status==='RETIRED' && nextStatus==='IN_STORE' && role!=='ADMIN')throw httpError(403,'Only administrators can restore items.');
   if (!transitions[asset.status].includes(nextStatus)) {
     throw httpError(409, `Invalid status transition: ${asset.status} -> ${nextStatus}.`, 'INVALID_STATUS_TRANSITION');
   }
   return prisma.$transaction(async tx => {
     const txModel = kind === 'workstation' ? tx.workstation : tx.peripheral;
-    const updated = await txModel.update({ where: { [key]: tag }, data: { status: nextStatus } });
+    const updated = await txModel.update({ where: { [key]: tag }, data: { status: nextStatus, ...(nextStatus==='IN_STORE'?(kind==='workstation'?{personnelId:null,userName:null,assignedDate:null}:{personnelId:null,workstationTag:null}):{}) } });
     await audit(tx, userEmail, tag, `${nextStatus === 'IN_STORE' && asset.status === 'RETIRED' ? 'Restored asset' : 'Changed status'}: ${asset.status} -> ${nextStatus}`);
     return updated;
   });
@@ -172,7 +174,7 @@ async function changeStatus(kind, tag, nextStatus, userEmail) {
 // Health Check
 app.get('/health', (req, res) => res.json({ ok: true, timestamp: new Date().toISOString() }));
 app.use('/api/admin', requireAuth, adminTools(prisma, backups));
-app.use('/api/ai', requireAuth, aiRoutes(prisma, vault));
+app.use('/api/ai', requireAuth, (req,res,next)=>req.path==='/analyze'?requirePermission('view')(req,res,next):next(), aiRoutes(prisma, vault));
 
 // Authentication Login
 app.post('/api/auth/login', async (req, res) => {
@@ -188,7 +190,7 @@ app.post('/api/auth/login', async (req, res) => {
   const token = jwt.sign({ email: user.email, role: user.role, fullName: user.fullName }, secret, { expiresIn: '12h' });
   res.json({
     token,
-    user: { email: user.email, fullName: user.fullName, role: user.role, status: user.status }
+    user: { email: user.email, fullName: user.fullName, role: user.role, status: user.status, ...await userAccess(prisma,user) }
   });
 });
 
@@ -197,13 +199,13 @@ app.get('/api/auth/me', requireAuth, async (req, res) => {
   const user = await prisma.appUser.findUnique({ where: { email: req.auth.email } });
   if (!user) throw httpError(404, 'User account not found.', 'NOT_FOUND');
   const { passwordHash: _, ...rest } = user;
-  res.json(rest);
+  res.json({...rest,...await userAccess(prisma,user)});
 });
 
 // =====================================================================
 // PERSONNEL ROUTES (Inventory asset assignment & ownership)
 // =====================================================================
-app.get('/api/personnel', requireAuth, async (req, res) => {
+app.get('/api/personnel', requireAuth, requirePermission('view'), async (req, res) => {
   const personnelList = await prisma.personnel.findMany({
     include: {
       peripherals: true,
@@ -234,7 +236,7 @@ app.get('/api/personnel', requireAuth, async (req, res) => {
   res.json(enriched);
 });
 
-app.get('/api/personnel/:id', requireAuth, async (req, res) => {
+app.get('/api/personnel/:id', requireAuth, requirePermission('view'), async (req, res) => {
   const person = await prisma.personnel.findUnique({
     where: { id: req.params.id },
     include: {
@@ -250,7 +252,7 @@ app.get('/api/personnel/:id', requireAuth, async (req, res) => {
   res.json(person);
 });
 
-app.post('/api/personnel', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.post('/api/personnel', requireAuth, requirePermission('add'), async (req, res) => {
   const data = parsed(personnelSchema, req.body);
   const created = await prisma.$transaction(async tx => {
     const person = await tx.personnel.create({
@@ -268,7 +270,7 @@ app.post('/api/personnel', requireAuth, requireRole(['ADMIN', 'EDITOR']), async 
   res.status(201).json(created);
 });
 
-app.patch('/api/personnel/:id', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.patch('/api/personnel/:id', requireAuth, requirePermission('edit'), async (req, res) => {
   const data = parsed(personnelSchema.partial(), req.body);
   const updated = await prisma.$transaction(async tx => {
     const person = await tx.personnel.update({
@@ -293,7 +295,7 @@ app.patch('/api/personnel/:id', requireAuth, requireRole(['ADMIN', 'EDITOR']), a
   res.json(updated);
 });
 
-app.delete('/api/personnel/:id', requireAuth, requireRole(['ADMIN']), async (req, res) => {
+app.delete('/api/personnel/:id', requireAuth, requirePermission('delete'), async (req, res) => {
   const person = await prisma.personnel.findUnique({ where: { id: req.params.id } });
   if (!person) throw httpError(404, 'Personnel record not found.', 'NOT_FOUND');
 
@@ -313,11 +315,11 @@ app.delete('/api/personnel/:id', requireAuth, requireRole(['ADMIN']), async (req
 // =====================================================================
 // GLOBAL ASSET LOOKUP
 // =====================================================================
-app.post('/api/assets/:kind/:tag/assign', requireAuth, requireRole(['ADMIN','EDITOR']), async (req,res) => {
+app.post('/api/assets/:kind/:tag/assign', requireAuth, requirePermission('edit'), async (req,res) => {
   res.json(await assignAsset(prisma,req.params.kind,req.params.tag,req.body,req.auth.email));
 });
 
-app.get('/api/assets/lookup/:tag', requireAuth, async (req, res) => {
+app.get('/api/assets/lookup/:tag', requireAuth, requirePermission('view'), async (req, res) => {
   const tag = req.params.tag.trim();
   const workstation = await prisma.workstation.findUnique({
     where: { workstationTag: tag },
@@ -337,7 +339,7 @@ app.get('/api/assets/lookup/:tag', requireAuth, async (req, res) => {
 // =====================================================================
 // DELTA SYNC ENDPOINT (For Mobile Client)
 // =====================================================================
-app.get('/api/sync', requireAuth, async (req, res) => {
+app.get('/api/sync', requireAuth, requirePermission('view'), async (req, res) => {
   const since = req.query.since ? new Date(req.query.since) : null;
   const [workstations, peripherals, personnel, users, settings, logs] = await Promise.all([
     prisma.workstation.findMany({ include: { peripherals: true, personnel: true } }),
@@ -354,7 +356,7 @@ app.get('/api/sync', requireAuth, async (req, res) => {
     workstations,
     peripherals,
     personnel,
-    users,
+    users: req.auth.role==='ADMIN'?users:[],
     settings: settings.filter(s => !privateSetting(s.key)),
     logs,
   });
@@ -363,7 +365,7 @@ app.get('/api/sync', requireAuth, async (req, res) => {
 // =====================================================================
 // WORKSTATIONS ENDPOINTS
 // =====================================================================
-app.get('/api/workstations', requireAuth, async (req, res) => {
+app.get('/api/workstations', requireAuth, requirePermission('view'), async (req, res) => {
   const workstations = await prisma.workstation.findMany({
     include: { peripherals: true, personnel: true },
     orderBy: { workstationTag: 'asc' },
@@ -371,7 +373,7 @@ app.get('/api/workstations', requireAuth, async (req, res) => {
   res.json(workstations);
 });
 
-app.post('/api/workstations', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.post('/api/workstations', requireAuth, requirePermission('add'), async (req, res) => {
   const data = parsed(workstationSchema, req.body);
   const { workstationTag, customFields, userName, personnelId, ...fields } = data;
 
@@ -400,7 +402,7 @@ app.post('/api/workstations', requireAuth, requireRole(['ADMIN', 'EDITOR']), asy
         personnelId: assignedPersonnelId,
         ...fields,
         customFields: serializeCustomFields(customFields),
-        status: 'IN_STORE',
+        status: assignedPersonnelId ? 'ASSIGNED' : 'IN_STORE',
       }
     });
     await audit(tx, req.auth.email, workstationTag, 'Created workstation');
@@ -409,7 +411,7 @@ app.post('/api/workstations', requireAuth, requireRole(['ADMIN', 'EDITOR']), asy
   res.status(201).json(asset);
 });
 
-app.patch('/api/workstations/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.patch('/api/workstations/:tag', requireAuth, requirePermission('edit'), async (req, res) => {
   const data = parsed(workstationSchema.omit({ workstationTag: true }).partial(), req.body);
   const { customFields, userName, personnelId, ...fields } = data;
   const updateData = { ...fields };
@@ -438,6 +440,13 @@ app.patch('/api/workstations/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR']
   if (customFields !== undefined) updateData.customFields = serializeCustomFields(customFields);
 
   const asset = await prisma.$transaction(async tx => {
+    const existing=await tx.workstation.findUnique({where:{workstationTag:req.params.tag}});
+    if(!existing)throw httpError(404,'Workstation not found.');
+    if(updateData.personnelId!==undefined && updateData.personnelId!==existing.personnelId){
+      if(['RETIRED','SCRAPPED','OUT_OF_ORDER'].includes(existing.status))throw httpError(409,'Return this item to service before changing its assignment.');
+      updateData.status=updateData.personnelId?'ASSIGNED':'IN_STORE';
+      updateData.assignedDate=updateData.personnelId?new Date():null;
+    }
     const updated = await tx.workstation.update({
       where: { workstationTag: req.params.tag },
       data: updateData,
@@ -451,7 +460,7 @@ app.patch('/api/workstations/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR']
 // =====================================================================
 // PERIPHERALS ENDPOINTS
 // =====================================================================
-app.get('/api/peripherals', requireAuth, async (req, res) => {
+app.get('/api/peripherals', requireAuth, requirePermission('view'), async (req, res) => {
   const peripherals = await prisma.peripheral.findMany({
     include: { personnel:true, workstation: { include: { personnel: true } } },
     orderBy: { peripheralTag: 'asc' },
@@ -459,7 +468,7 @@ app.get('/api/peripherals', requireAuth, async (req, res) => {
   res.json(peripherals);
 });
 
-app.post('/api/peripherals', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.post('/api/peripherals', requireAuth, requirePermission('add'), async (req, res) => {
   const data = parsed(peripheralSchema, req.body);
   const { peripheralTag, workstationTag, customFields, ...fields } = data;
   if (workstationTag && !await prisma.workstation.findUnique({ where: { workstationTag } })) {
@@ -472,7 +481,7 @@ app.post('/api/peripherals', requireAuth, requireRole(['ADMIN', 'EDITOR']), asyn
         workstationTag: workstationTag || null,
         ...fields,
         customFields: serializeCustomFields(customFields),
-        status: 'IN_STORE',
+        status: workstationTag ? 'ASSIGNED' : 'IN_STORE',
         quantity: fields.quantity ?? 1,
       }
     });
@@ -482,7 +491,7 @@ app.post('/api/peripherals', requireAuth, requireRole(['ADMIN', 'EDITOR']), asyn
   res.status(201).json(asset);
 });
 
-app.patch('/api/peripherals/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.patch('/api/peripherals/:tag', requireAuth, requirePermission('edit'), async (req, res) => {
   const data = parsed(peripheralSchema.omit({ peripheralTag: true }).partial(), req.body);
   const { customFields, ...fields } = data;
   if (fields.workstationTag && !await prisma.workstation.findUnique({ where: { workstationTag: fields.workstationTag } })) {
@@ -494,6 +503,12 @@ app.patch('/api/peripherals/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR'])
   if (customFields !== undefined) updateData.customFields = serializeCustomFields(customFields);
 
   const asset = await prisma.$transaction(async tx => {
+    const existing=await tx.peripheral.findUnique({where:{peripheralTag:req.params.tag}});
+    if(!existing)throw httpError(404,'Peripheral not found.');
+    if(updateData.workstationTag!==undefined && updateData.workstationTag!==existing.workstationTag){
+      if(['RETIRED','SCRAPPED','OUT_OF_ORDER'].includes(existing.status))throw httpError(409,'Return this item to service before changing its assignment.');
+      updateData.status=updateData.workstationTag||existing.personnelId?'ASSIGNED':'IN_STORE';
+    }
     const updated = await tx.peripheral.update({
       where: { peripheralTag: req.params.tag },
       data: updateData,
@@ -505,7 +520,7 @@ app.patch('/api/peripherals/:tag', requireAuth, requireRole(['ADMIN', 'EDITOR'])
 });
 
 // Asset Lifecycle (Retire / Restore / Status Update)
-app.patch('/api/assets/:kind/:tag/status', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.patch('/api/assets/:kind/:tag/status', requireAuth, requirePermission('edit'), async (req, res) => {
   if (!['workstation', 'peripheral'].includes(req.params.kind)) {
     throw httpError(400, 'kind must be workstation or peripheral.', 'VALIDATION_ERROR');
   }
@@ -520,14 +535,14 @@ app.patch('/api/assets/:kind/:tag/status', requireAuth, requireRole(['ADMIN', 'E
       return model.findUnique({where:{[key]:tag}});
     });return res.json(result);
   }
-  res.json(await changeStatus(req.params.kind, req.params.tag, status, req.auth.email));
+  res.json(await changeStatus(req.params.kind, req.params.tag, status, req.auth.email, req.auth.role));
 });
 
-app.post('/api/assets/:kind/:tag/restore', requireAuth, requireRole(['ADMIN', 'EDITOR']), async (req, res) => {
+app.post('/api/assets/:kind/:tag/restore', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   if (!['workstation', 'peripheral'].includes(req.params.kind)) {
     throw httpError(400, 'kind must be workstation or peripheral.', 'VALIDATION_ERROR');
   }
-  res.json(await changeStatus(req.params.kind, req.params.tag, 'IN_STORE', req.auth.email));
+  res.json(await changeStatus(req.params.kind, req.params.tag, 'IN_STORE', req.auth.email, req.auth.role));
 });
 
 // =====================================================================
@@ -629,7 +644,7 @@ app.delete('/api/settings/custom-fields/:id', requireAuth, requireRole(['ADMIN']
 // =====================================================================
 app.get('/api/users', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   const users = await prisma.appUser.findMany({ orderBy: { email: 'asc' } });
-  res.json(users.map(u => { const { passwordHash, ...rest } = u; return rest; }));
+  res.json(await Promise.all(users.map(async u => { const { passwordHash, ...rest } = u; return {...rest,...await userAccess(prisma,u)}; })));
 });
 
 app.post('/api/users', requireAuth, requireRole(['ADMIN']), async (req, res) => {
@@ -637,6 +652,7 @@ app.post('/api/users', requireAuth, requireRole(['ADMIN']), async (req, res) => 
   if (!email || !fullName || !role || !status) {
     throw httpError(400, 'Email, full name, role, and status are required.', 'VALIDATION_ERROR');
   }
+  if(!['ADMIN','EDITOR','VIEWER'].includes(role)||!['ACTIVE','INACTIVE'].includes(status))throw httpError(400,'Choose a valid role and account status.');
   const passwordHash = password ? await bcrypt.hash(password, 10) : null;
   const user = await prisma.$transaction(async tx => {
     const created = await tx.appUser.create({
@@ -648,16 +664,19 @@ app.post('/api/users', requireAuth, requireRole(['ADMIN']), async (req, res) => 
         passwordHash,
       }
     });
+    await saveAccess(tx,created.email,req.body.customPermissions);
     await audit(tx, req.auth.email, null, `Created user account: ${created.email} (${created.role})`);
     return created;
   });
   const { passwordHash: _, ...rest } = user;
-  res.status(201).json(rest);
+  res.status(201).json({...rest,...await userAccess(prisma,user)});
 });
 
 app.patch('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req, res) => {
   const email = req.params.email.toLowerCase().trim();
   const { fullName, role, status, password } = req.body;
+  if(role && !['ADMIN','EDITOR','VIEWER'].includes(role) || status && !['ACTIVE','INACTIVE'].includes(status))throw httpError(400,'Choose a valid role and account status.');
+  if(email===req.auth.email && (role && role!=='ADMIN' || status && status!=='ACTIVE'))throw httpError(400,'You cannot remove your own administrator access.');
   const data = {};
   if (fullName) data.fullName = fullName.trim();
   if (role) data.role = role.trim().toUpperCase();
@@ -666,11 +685,12 @@ app.patch('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req, 
 
   const user = await prisma.$transaction(async tx => {
     const updated = await tx.appUser.update({ where: { email }, data });
+    await saveAccess(tx,email,req.body.customPermissions);
     await audit(tx, req.auth.email, null, `Updated user profile & access: ${email}`);
     return updated;
   });
   const { passwordHash: _, ...rest } = user;
-  res.json(rest);
+  res.json({...rest,...await userAccess(prisma,user)});
 });
 
 app.delete('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req, res) => {
@@ -680,6 +700,7 @@ app.delete('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req,
   }
   await prisma.$transaction(async tx => {
     await tx.appUser.delete({ where: { email } });
+    await tx.appSetting.deleteMany({where:{key:accessKey(email)}});
     await audit(tx, req.auth.email, null, `Deleted user account: ${email}`);
   });
   res.status(204).send();
@@ -688,7 +709,7 @@ app.delete('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req,
 // =====================================================================
 // AUDIT LOGS ENDPOINTS
 // =====================================================================
-app.get('/api/logs', requireAuth, async (req, res) => {
+app.get('/api/logs', requireAuth, requirePermission('view'), async (req, res) => {
   const { user, asset, from, to } = req.query;
   const where = {};
   if (user) where.userEmail = { contains: String(user) };
@@ -725,7 +746,7 @@ app.post('/api/excel/import', requireAuth, requireRole(['ADMIN']), upload.single
   res.status(200).json(result);
 });
 
-app.get('/api/excel/export', requireAuth, async (req, res) => {
+app.get('/api/excel/export', requireAuth, requirePermission('export'), async (req, res) => {
   const content = await exportWorkbook(prisma);
   res.type('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
      .attachment('IT Asset Database.xlsx')

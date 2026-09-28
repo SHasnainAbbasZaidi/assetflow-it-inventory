@@ -127,10 +127,14 @@ class _SettingsViewState extends State<SettingsView> {
     final labels = [
       'Server connection',
       'AI API Keys',
-      'Company branding',
-      'Tag customizer',
-      'Custom fields',
-      'Users & access',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Company branding',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Tag customizer',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Custom fields',
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        'Users & access',
       if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
         'Backup and Restore',
       if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
@@ -139,13 +143,18 @@ class _SettingsViewState extends State<SettingsView> {
     final panels = [
       _buildServerConfigCard(context),
       const AISettingsView(),
-      _buildBrandingCard(context),
-      _buildTagCustomizerCard(context),
-      _buildCustomFieldsManagerCard(context),
-      SizedBox(
-          height: 520,
-          child: AppUserManagementSection(
-              showHeader: true, onAddUser: () => _openAdminUserForm(context))),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        _buildBrandingCard(context),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        _buildTagCustomizerCard(context),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        _buildCustomFieldsManagerCard(context),
+      if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
+        SizedBox(
+            height: 520,
+            child: AppUserManagementSection(
+                showHeader: true,
+                onAddUser: () => _openAdminUserForm(context))),
       if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
         const AdminToolsView(key: ValueKey('backups'), mode: 'backups'),
       if (context.watch<AuthProvider>().currentUser?.isAdmin ?? false)
@@ -174,8 +183,7 @@ class _SettingsViewState extends State<SettingsView> {
                     onChanged: (i) => setState(() => _category = i ?? 0))),
           panels[_category < panels.length ? _category : 0],
           const SizedBox(height: 24),
-          const Text(
-              'A product of Mahzaidex Tech\nDeveloped by Hasnain Zaidi',
+          const Text('A product of Mahzaidex Tech\nDeveloped by Hasnain Zaidi',
               style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
         ]);
         return Row(children: [
@@ -297,7 +305,6 @@ class _SettingsViewState extends State<SettingsView> {
       ),
     );
   }
-
 
   Widget _buildBrandingCard(BuildContext context) {
     return Center(

@@ -76,8 +76,16 @@ class _MainLayoutState extends State<MainLayout> {
       'icon': Icons.assessment_outlined,
       'view': const AdminToolsView(mode: 'reports')
     },
-    {'title': 'Devices', 'icon': Icons.print_outlined, 'view': const DashboardView(initialGroup: 'Devices')},
-    {'title': 'Components', 'icon': Icons.memory, 'view': const DashboardView(initialGroup: 'Components')},
+    {
+      'title': 'Devices',
+      'icon': Icons.print_outlined,
+      'view': const DashboardView(initialGroup: 'Devices')
+    },
+    {
+      'title': 'Components',
+      'icon': Icons.memory,
+      'view': const DashboardView(initialGroup: 'Components')
+    },
   ];
 
   void _onSearchChanged(String query) {
@@ -94,12 +102,18 @@ class _MainLayoutState extends State<MainLayout> {
     final double screenWidth = MediaQuery.of(context).size.width;
     final bool isDesktop = screenWidth >= 850;
 
-    final isAdmin = context.watch<AuthProvider>().currentUser?.isAdmin ?? false;
+    final isAdmin =
+        context.watch<AuthProvider>().currentUser?.can('reports') ?? false;
     if (_currentIndex == 8 && !isAdmin) _currentIndex = 0;
     Widget currentView = _navItems[_currentIndex]['view'] as Widget;
     if (_searchController.text.trim().isNotEmpty)
       currentView = GlobalSearchView(query: _searchController.text);
 
+    if (!(context.watch<AuthProvider>().currentUser?.can('view') ?? false) &&
+        ![7, 8].contains(_currentIndex))
+      currentView = const Center(
+          child:
+              Text('Inventory access is disabled. Contact an administrator.'));
     // Direct search query injection
     if (currentView is WorkstationsView) {
       currentView = WorkstationsView(searchQuery: _searchController.text);

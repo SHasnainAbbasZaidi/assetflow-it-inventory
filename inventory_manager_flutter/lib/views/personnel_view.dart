@@ -1,3 +1,4 @@
+import '../providers/auth_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:inventory_manager_flutter/models/personnel.dart';
@@ -196,12 +197,15 @@ class _PersonnelViewState extends State<PersonnelView> {
 
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _openPersonnelForm(context),
-        backgroundColor: const Color(0xFF6366F1),
-        foregroundColor: Colors.white,
-        child: const Icon(Icons.person_add_rounded),
-      ),
+      floatingActionButton:
+          (context.watch<AuthProvider>().currentUser?.can('add') ?? false)
+              ? FloatingActionButton(
+                  onPressed: () => _openPersonnelForm(context),
+                  backgroundColor: const Color(0xFF6366F1),
+                  foregroundColor: Colors.white,
+                  child: const Icon(Icons.person_add_rounded),
+                )
+              : null,
       body: Padding(
         padding: const EdgeInsets.all(32.0),
         child: Column(

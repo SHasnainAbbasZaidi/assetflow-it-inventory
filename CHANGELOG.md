@@ -1,6 +1,12 @@
 # Release notes
 
-## Unreleased
+## 1.2.1 — 2026-09-28
+
+- Restore web Status / Assign actions in all hardware categories using the same assignment API as Android. Keep assignment status consistent when saving ownership through edit forms.
+
+- Restrict asset and backup restore to administrators, including alternate status API routes.
+- Add individual View, Add, Edit, Delete personnel, Export and Reports permissions in Users & Access on web and Android. Access changes are enforced on every server request; administrator-only recovery and destructive inventory tools cannot be delegated.
+- Fix scanner app-resume handling, add camera retry after permission denial, and load the authenticated mobile profile directly so non-admin accounts receive their correct permissions. Android build: 1.2.1 (4). Camera lifecycle is covered by simulated tests; physical-device confirmation remains required.
 
 - Separate the overall Dashboard from category management views on web and mobile. Refine the web overview with summary cards, hardware distribution, lifecycle chart and activity panels.
 - Align Excel exports and daily Excel backups with the four hardware categories; include personnel and preserve identifiers, assignments, specifications and custom fields on import.

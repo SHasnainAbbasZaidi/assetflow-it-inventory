@@ -47,3 +47,7 @@ The release APK and checksums are published in [GitHub Releases](https://github.
 Version 1.2.0 groups inventory into Workstations, Peripherals, Devices and Components on web and Android. Classification is a view of existing records; upgrades do not move or recreate assets. Mobile sign-in remains Server URL, Username and Password. [View the reference screenshots](docs/screenshots/v1.2.0/README.md).
 
 Compact A4 layouts follow the supplied tag reference and preserve actual label size. Scrap status updates and imports automatically register reports. Older scrapped records with missing history are explicitly marked as having an unknown original scrap date/operator.
+
+### Individual user access
+
+Administrators can use Settings → Users & Access → Edit Account to keep the base role defaults or enable individual View, Add, Edit, Delete personnel, Export and Reports permissions. Delete applies to personnel records; permanent inventory deletion, scrapping, account administration, backups and all Restore actions remain administrator-only. The server checks current permissions on every request. Sign in again to refresh mobile controls after access changes. Full-state backups preserve individual permissions; Excel account sheets preserve roles but do not replace permission settings.

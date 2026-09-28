@@ -21,6 +21,14 @@ let data = {
     customFields: []
 };
 
+const accessLabels = {view:'View inventory and personnel',add:'Add items and personnel',edit:'Edit items, assignments and status',delete:'Delete personnel records',export:'Export Excel',reports:'View and generate reports'};
+function canAccess(permission) { return currentUser?.role === 'ADMIN' || (currentUser?.permissions?.[permission] ?? (['view','export'].includes(permission) || currentUser?.role === 'EDITOR' && ['add','edit'].includes(permission))); }
+function renderUserPermissions() {
+ const role=document.getElementById('userRole').value;
+ const panel=document.getElementById('userPermissions');
+ panel.querySelectorAll('[data-permission]').forEach(el=>el.disabled=role==='ADMIN'||!document.getElementById('customAccess').checked);
+}
+
 // API Helper
 async function api(path, options = {}) {
     const headers = {
@@ -140,6 +148,9 @@ function applyRBAC() {
     const role = (currentUser?.role || 'VIEWER').toUpperCase();
     const isAdmin = role === 'ADMIN';
 
+    document.querySelector('[data-tab=reports]')?.classList.remove('admin-only');
+    const reportsNav=document.querySelector('[data-tab=reports]');if(reportsNav)reportsNav.style.display=canAccess('reports')?'':'none';
+    const excelNav=document.querySelector('[data-tab=excel]');if(excelNav)excelNav.style.display=canAccess('export')?'':'none';
     // Hide admin navigation items if not admin
     document.querySelectorAll('.admin-only').forEach(el => {
         el.style.display = isAdmin ? '' : 'none';
@@ -257,8 +268,8 @@ function setupEventListeners() {
 function switchTab(tab) {
     document.body.classList.remove('navigation-open');
     document.querySelector('.mobile-menu')?.setAttribute('aria-expanded','false');
-    if (tab === 'reports' && currentUser?.role !== 'ADMIN') {
-        showToast('Settings are restricted to Administrators.', 'error');
+    if (tab === 'reports' && !canAccess('reports')) {
+        showToast('Your account does not have reports access.', 'error');
         return;
     }
 
@@ -269,6 +280,7 @@ function switchTab(tab) {
 
     const container = document.getElementById('viewContainer');
     if (!container) return;
+    if(!canAccess('view') && !['settings','reports','excel'].includes(tab)){container.innerHTML='<div class="settings-pane"><h2>Inventory access restricted</h2><p>Ask an administrator to enable View access for your account.</p></div>';return;}
     if (dataLoadError && !['settings'].includes(tab)) { container.innerHTML = '<div class="settings-pane"><h2>Data could not be loaded</h2><p>Your records have not been replaced. Check the server connection and database status.</p><button class="btn btn-primary" onclick="loadAllData().then(() => switchTab(currentTab))">Retry</button></div>'; return; }
 
     if (tab === 'dashboard') renderInventoryOverview(container);
@@ -286,6 +298,11 @@ function switchTab(tab) {
 // Data Fetching
 async function loadAllData() {
     try {
+        currentUser=await api('/api/auth/me');
+        updateHeaderUserInfo();
+        localStorage.setItem('assetflow_user',JSON.stringify(currentUser));
+        applyRBAC();
+        if(!canAccess('view')) { data={workstations:[],peripherals:[],personnel:[],users:[],logs:[],settings:{},customFields:[]};dataLoadError=null;return; }
         const promises = [
             api('/api/workstations'),
             api('/api/peripherals'),
@@ -442,7 +459,7 @@ function renderDashboard(container) {
 // 2. WORKSTATIONS VIEW
 // =====================================================================
 function renderWorkstations(container) {
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     container.innerHTML = `
         <div class="page-header">
             <div class="page-title">
@@ -495,7 +512,7 @@ function renderWorkstations(container) {
 }
 
 function generateWorkstationsRows(workstations) {
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     if (!workstations.length) {
         return `<tr><td colspan="7" style="text-align:center; padding: 32px; color: var(--text-muted);">No workstations found</td></tr>`;
     }
@@ -523,7 +540,7 @@ function generateWorkstationsRows(workstations) {
                     <button class="icon-btn" title="View Details" onclick="lookupAsset('${escapeHtml(ws.workstationTag)}')"><i class="ph ph-eye"></i></button>
                     ${!isViewer ? `<button class="icon-btn" title="Edit Workstation" onclick="editWorkstation('${escapeHtml(ws.workstationTag)}')"><i class="ph ph-pencil-simple"></i></button>` : ''}
                     <button class="icon-btn" title="Print Tag" onclick="printTag('${escapeHtml(ws.workstationTag)}', 'workstation')"><i class="ph ph-printer"></i></button>
-                    ${!isViewer && ws.status !== 'SCRAPPED' ? (ws.status === 'RETIRED'
+                    ${canAccess('edit') && ws.status !== 'SCRAPPED' && (ws.status !== 'RETIRED' || currentUser?.role === 'ADMIN') ? (ws.status === 'RETIRED'
                         ? `<button class="btn btn-sm btn-success" onclick="restoreAsset('workstation', '${escapeHtml(ws.workstationTag)}')">Restore</button>`
                         : `<button class="btn btn-sm btn-danger" onclick="retireAsset('workstation', '${escapeHtml(ws.workstationTag)}')">Retire</button>`
                     ) : ''}
@@ -559,7 +576,7 @@ let peripheralGroup = 'Peripherals';
 function renderPeripherals(container, group = 'Peripherals') {
     peripheralGroup=group;
     const groupItems=data.peripherals.filter(p=>HardwareGroups.classify(p.category)===group);
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     const categories = [...new Set(groupItems.map(p => p.category).filter(Boolean))];
 
     container.innerHTML = `
@@ -619,7 +636,7 @@ function renderPeripherals(container, group = 'Peripherals') {
 }
 
 function generatePeripheralsRows(peripherals) {
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     if (!peripherals.length) {
         return `<tr><td colspan="8" style="text-align:center; padding: 32px; color: var(--text-muted);">No peripherals found</td></tr>`;
     }
@@ -652,7 +669,7 @@ function generatePeripheralsRows(peripherals) {
                     <button class="icon-btn" title="View Details" onclick="lookupAsset('${escapeHtml(p.peripheralTag)}')"><i class="ph ph-eye"></i></button>
                     ${!isViewer ? `<button class="icon-btn" title="Edit Peripheral" onclick="editPeripheral('${escapeHtml(p.peripheralTag)}')"><i class="ph ph-pencil-simple"></i></button>` : ''}
                     <button class="icon-btn" title="Print Tag" onclick="printTag('${escapeHtml(p.peripheralTag)}', 'peripheral')"><i class="ph ph-printer"></i></button>
-                    ${!isViewer && p.status !== 'SCRAPPED' ? (p.status === 'RETIRED'
+                    ${canAccess('edit') && p.status !== 'SCRAPPED' && (p.status !== 'RETIRED' || currentUser?.role === 'ADMIN') ? (p.status === 'RETIRED'
                         ? `<button class="btn btn-sm btn-success" onclick="restoreAsset('peripheral', '${escapeHtml(p.peripheralTag)}')">Restore</button>`
                         : `<button class="btn btn-sm btn-danger" onclick="retireAsset('peripheral', '${escapeHtml(p.peripheralTag)}')">Retire</button>`
                     ) : ''}
@@ -688,7 +705,7 @@ function filterPeripherals() {
 // 4. PERSONNEL TAB (Dedicated Top-Level Inventory Ownership View)
 // =====================================================================
 function renderPersonnel(container) {
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     const departments = [...new Set(data.personnel.map(p => p.department).filter(Boolean))];
 
     container.innerHTML = `
@@ -698,7 +715,7 @@ function renderPersonnel(container) {
                 <p>Staff members who hold and operate assigned physical assets</p>
             </div>
             <div class="header-controls">
-                ${!isViewer ? `<button class="btn btn-primary" onclick="openPersonnelModal()"><i class="ph ph-user-plus"></i> New Personnel</button>` : ''}
+                ${canAccess('add') ? `<button class="btn btn-primary" onclick="openPersonnelModal()"><i class="ph ph-user-plus"></i> New Personnel</button>` : ''}
             </div>
         </div>
 
@@ -739,7 +756,7 @@ function renderPersonnel(container) {
 }
 
 function generatePersonnelRows(personnelList) {
-    const isViewer = currentUser?.role === 'VIEWER';
+    const isViewer = !canAccess('edit');
     const isAdmin = currentUser?.role === 'ADMIN';
 
     if (!personnelList.length) {
@@ -774,7 +791,7 @@ function generatePersonnelRows(personnelList) {
                         <i class="ph ph-stack"></i> View Inventory
                     </button>
                     ${!isViewer ? `<button class="icon-btn" title="Edit Profile" onclick="editPersonnel('${escapeHtml(p.id)}')"><i class="ph ph-pencil-simple"></i></button>` : ''}
-                    ${isAdmin ? `<button class="icon-btn" title="Delete Personnel" style="color: #f87171;" onclick="deletePersonnel('${escapeHtml(p.id)}')"><i class="ph ph-trash"></i></button>` : ''}
+                    ${canAccess('delete') ? `<button class="icon-btn" title="Delete Personnel" style="color: #f87171;" onclick="deletePersonnel('${escapeHtml(p.id)}')"><i class="ph ph-trash"></i></button>` : ''}
                 </div>
             </td>
         </tr>
@@ -888,6 +905,7 @@ async function openPersonnelOwnershipModal(id) {
 let editingPersonnelId = null;
 
 function openPersonnelModal(id = null) {
+    if(!canAccess(id?'edit':'add'))return showToast('Your account does not have this permission.','error');
     editingPersonnelId = id;
     const modalTitle = document.getElementById('personnelModalTitle');
     const form = document.getElementById('personnelForm');
@@ -1430,6 +1448,13 @@ function openUserModal(email = null) {
         modalTitle.textContent = 'New Login Account';
         document.getElementById('userEmail').disabled = false;
     }
+    let panel=document.getElementById('userPermissions');
+    if(!panel){panel=document.createElement('div');panel.id='userPermissions';form.querySelector('.modal-body').appendChild(panel);}
+    const account=data.users.find(u=>u.email===email), overrides=account?.customPermissions;
+    panel.innerHTML=`<h3>Custom access</h3><label><input type="checkbox" id="customAccess" ${overrides?'checked':''}> Use individual permissions</label><p>Restore, backups, account management, scrapping and permanent inventory deletion are administrator-only. Delete permission applies to personnel records.</p>${Object.entries(accessLabels).map(([key,label])=>`<label style="display:block;padding:6px"><input type="checkbox" data-permission="${key}" ${(overrides?.[key]??account?.permissions?.[key]??['view','export'].includes(key))?'checked':''}> ${label}</label>`).join('')}`;
+    document.getElementById('customAccess').onchange=renderUserPermissions;
+    document.getElementById('userRole').onchange=renderUserPermissions;
+    renderUserPermissions();
     openModal('userModal');
 }
 
@@ -1455,7 +1480,7 @@ async function handleUserFormSubmit(e) {
     const status = document.getElementById('userStatus').value;
     const password = document.getElementById('userPassword').value;
 
-    const payload = { email, fullName, role, status };
+    const payload = { email, fullName, role, status, customPermissions:document.getElementById('customAccess').checked?Object.fromEntries([...document.querySelectorAll('[data-permission]')].map(el=>[el.dataset.permission,el.checked])):null };
     if (password) payload.password = password;
 
     try {
@@ -1530,6 +1555,9 @@ function renderLogs(container) {
 // 7. EXCEL IMPORT / EXPORT (Fixed Button & Live Upload Handling)
 // =====================================================================
 function renderExcelTools(container) {
+    if(!canAccess('export')){container.innerHTML='<div class="settings-pane">Excel export access is disabled.</div>';return;}
+    if(currentUser?.role!=='ADMIN'){container.innerHTML='<div class="settings-pane"><h2>Export inventory</h2><p>Download the current hardware category workbook.</p><button class="btn btn-primary" onclick="exportExcel()">Download Excel</button></div>';return;}
+
     container.innerHTML = `
         <div class="page-header">
             <div class="page-title">
@@ -1674,6 +1702,7 @@ async function uploadExcelFile() {
 }
 
 async function exportExcel() {
+    if(!canAccess('export'))return showToast('Excel export access is disabled.','error');
     showToast('Preparing Excel database export...', 'info');
     try {
         const response = await fetch('/api/excel/export', {
@@ -1765,12 +1794,12 @@ async function lookupAsset(tag) {
         bodyHtml += `</div>`;
         document.getElementById('lookupModalBody').innerHTML = bodyHtml;
 
-        const isViewer = currentUser?.role === 'VIEWER';
+        const isViewer = !canAccess('edit');
         const footer = document.getElementById('lookupModalFooter');
         footer.innerHTML = `
             <button class="btn btn-secondary" onclick="closeModal('lookupModal')">Close</button>
             <button class="btn btn-secondary" onclick="printTag('${isWs ? asset.workstationTag : asset.peripheralTag}', '${isWs ? 'workstation' : 'peripheral'}')"><i class="ph ph-printer"></i> Print Tag</button>
-            ${!isViewer && asset.status !== 'SCRAPPED' ? (asset.status === 'RETIRED'
+            ${canAccess('edit') && asset.status !== 'SCRAPPED' && (asset.status !== 'RETIRED' || currentUser?.role === 'ADMIN') ? (asset.status === 'RETIRED'
                 ? `<button class="btn btn-success" onclick="restoreAsset('${isWs ? 'workstation' : 'peripheral'}', '${isWs ? asset.workstationTag : asset.peripheralTag}'); closeModal('lookupModal');">Restore Asset</button>`
                 : `<button class="btn btn-danger" onclick="retireAsset('${isWs ? 'workstation' : 'peripheral'}', '${isWs ? asset.workstationTag : asset.peripheralTag}'); closeModal('lookupModal');">Retire Asset</button>`
             ) : ''}
@@ -1784,6 +1813,7 @@ async function lookupAsset(tag) {
 let editingWorkstationTag = null;
 
 function openWorkstationModal(tag = null) {
+    if(!canAccess(tag?'edit':'add'))return showToast('Your account does not have this permission.','error');
     editingWorkstationTag = tag;
     const modalTitle = document.getElementById('workstationModalTitle');
     const form = document.getElementById('workstationForm');
@@ -1870,6 +1900,7 @@ async function handleWorkstationFormSubmit(e) {
 let editingPeripheralTag = null;
 
 function openPeripheralModal(tag = null) {
+    if(!canAccess(tag?'edit':'add'))return showToast('Your account does not have this permission.','error');
     editingPeripheralTag = tag;
     const modalTitle = document.getElementById('peripheralModalTitle');
     const form = document.getElementById('peripheralForm');
@@ -1963,6 +1994,7 @@ async function retireAsset(kind, tag) {
 }
 
 async function restoreAsset(kind, tag) {
+    if(currentUser?.role!=='ADMIN')return showToast('Only administrators can restore items.','error');
     try {
         await api(`/api/assets/${kind}/${encodeURIComponent(tag)}/restore`, {
             method: 'POST'

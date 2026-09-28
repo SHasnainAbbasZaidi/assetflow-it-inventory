@@ -665,6 +665,15 @@ tr:hover td {
 }
 
 /* Form inputs */
+#userForm { display:flex; flex-direction:column; min-height:0; }
+#userForm .modal-body { min-height:0; }
+#userForm .modal-footer { flex-shrink:0; }
+#userPermissions { border-top:1px solid var(--border-subtle); padding-top:16px; }
+#userPermissions h3 { font-size:16px; margin-bottom:12px; }
+#userPermissions p { font-size:12px; line-height:1.6; color:var(--text-secondary); margin:12px 0; }
+#userPermissions label { font-size:13px; line-height:1.5; }
+#userPermissions input { margin-right:8px; accent-color:var(--accent); }
+@media(max-width:600px) { #userForm .form-row { grid-template-columns:minmax(0,1fr); } }
 .form-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
