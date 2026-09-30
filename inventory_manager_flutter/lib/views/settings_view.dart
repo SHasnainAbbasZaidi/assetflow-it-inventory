@@ -486,6 +486,16 @@ class _SettingsViewState extends State<SettingsView> {
                           },
                         ),
                         SwitchListTile(
+                          title: const Text('Show Product Brand / Manufacturer'),
+                          subtitle: const Text('Uses item details when available.'),
+                          value: config['showManufacturer'] ?? true,
+                          onChanged: (val) {
+                            final newConfig = Map<String, dynamic>.from(config);
+                            newConfig['showManufacturer'] = val;
+                            provider.saveTagConfig(newConfig);
+                          },
+                        ),
+                        SwitchListTile(
                           title: const Text('Show Assigned User'),
                           value: config['showUser'] ?? true,
                           onChanged: (val) {
@@ -495,7 +505,7 @@ class _SettingsViewState extends State<SettingsView> {
                           },
                         ),
                         SwitchListTile(
-                          title: const Text('Show Company Name'),
+                          title: const Text('Show Organization Name'),
                           value: config['showCompany'] ?? true,
                           onChanged: (val) {
                             final newConfig = Map<String, dynamic>.from(config);

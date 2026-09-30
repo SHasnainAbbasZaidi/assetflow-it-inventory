@@ -7,7 +7,7 @@ const TagStudio = (() => {
     const esc = value => escapeHtml(String(value ?? ''));
     const number = (value, fallback=0) => Number.isFinite(Number(value)) ? Number(value) : fallback;
     const color = (value, fallback='#111827') => /^#[0-9a-f]{6}$/i.test(value || '') ? value : fallback;
-    const fields = ['companyName','companyAddress','tag','device','person','specs','status','purchaseDate','tagLabel','purchaseLabel','personLabel'];
+    const fields = ['manufacturer','companyName','companyAddress','tag','device','person','specs','status','purchaseDate','tagLabel','purchaseLabel','personLabel'];
     function load() {
         try { templates = JSON.parse(data.settings.tagTemplates || 'null'); } catch (_) { templates = null; }
         if (!Array.isArray(templates) || !templates.length) templates = ['workstation','peripheral'].map(TagLayout.defaults);
@@ -19,7 +19,10 @@ const TagStudio = (() => {
         const ws = kind === 'workstation';
         const item = (ws ? data.workstations : data.peripherals).find(a => a[ws ? 'workstationTag' : 'peripheralTag'] === tag);
         if (!item) return null;
-        return { kind, tag, fields:{ tag, companyName:data.settings.companyName || 'AssetFlow', companyAddress:data.settings.companyAddress || '',
+        let custom={};try{custom=typeof item.customFields==='string'?JSON.parse(item.customFields):item.customFields||{};}catch(_){}
+        if(!custom || typeof custom!=='object')custom={};
+        const manufacturer=[item.brandManufacturer,custom.brandManufacturer,custom.manufacturer,custom.brand,custom.productBrand].find(v=>typeof v==='string'&&v.trim())?.trim()||'';
+        return { kind, tag, fields:{ manufacturer, tag, companyName:data.settings.companyName || 'AssetFlow', companyAddress:data.settings.companyAddress || '',
             device: ws ? item.deviceType || 'Workstation' : [item.category,item.brandManufacturer,item.modelSpecs].filter(Boolean).join(' · '),
             person:item.personnel?.fullName || item.userName || item.workstation?.personnel?.fullName || 'Unassigned',
             specs:ws ? ['CPU: '+(item.processorGen || '—'),'Motherboard: '+(item.motherboard || '—'),'RAM: '+(item.ram || '—'),'Storage: '+([item.ssd,item.hdd].filter(Boolean).join(' / ') || '—'),'GPU: '+(item.gpu || '—')].join('\n') : item.modelSpecs || '',
@@ -57,7 +60,9 @@ const TagStudio = (() => {
                     if(e.type==='qr'){const logo=getCompanyLogo();if(/^data:image\/(png|jpeg|gif);base64,/i.test(logo||'')){const side=w*.17,cx=x+(w-side)/2,cy=y+(h-side)/2;g.innerHTML+=`<rect x="${cx-.5}" y="${cy-.5}" width="${side+1}" height="${side+1}" fill="white"/><image href="${logo}" x="${cx}" y="${cy}" width="${side}" height="${side}" preserveAspectRatio="xMidYMid meet"/>`;}}
                 } else if (editing) g.innerHTML += `<text x="${x+1}" y="${y+4}" font-size="3" fill="#64748b">${esc(e.type === 'qr' ? 'QR · select a real asset' : e.type)}</text>`;
             } else {
-                const text = e.type === 'field' ? record?.fields[e.field] ?? `{${e.field}}` : e.text || 'Text';
+                let text = e.type === 'field' ? record?.fields[e.field] ?? `{${e.field}}` : e.text || 'Text';
+                if(e.id==='title' && template.id.startsWith('compact-') && getTagConfig().showManufacturer && record?.fields.manufacturer)text=record.fields.manufacturer;
+                if(e.type==='field' && e.field==='manufacturer' && !getTagConfig().showManufacturer)text='';
                 let size=Math.max(1,Math.min(20,number(e.fontSize,3.5))), lines=[];
                 const pad=Math.max(0,Math.min(w/4,number(e.padding,0.5)));
                 for (let attempt=0;attempt<30;attempt++) {
@@ -137,12 +142,18 @@ const TagStudio = (() => {
     }
     function renderEditor() {
         const pane=document.getElementById('settingsPaneContainer');
-        pane.innerHTML=`<div class="settings-pane studio"><h3>Tag Customizer</h3><p>Drag elements to move; drag the highlighted corner to resize. Arrow keys nudge the selection. Dimensions are in millimetres.</p>
+        pane.innerHTML=`<div class="settings-pane studio"><h3>Tag Customizer</h3><label><input id="showManufacturer" type="checkbox" ${getTagConfig().showManufacturer?'checked':''}> Show product brand / manufacturer when available</label><p>Uses the item’s Brand / Manufacturer details. Compact tags show it in the heading; custom templates can add the manufacturer field.</p><p>Drag elements to move; drag the highlighted corner to resize. Arrow keys nudge the selection. Dimensions are in millimetres.</p>
         <div class="studio-tools"><select id="templateSelect" aria-label="Template">${templates.map(t=>`<option value="${esc(t.id)}" ${t.id===active?'selected':''}>${esc(t.name)}</option>`).join('')}</select><button data-command="new">New</button><button data-command="duplicate">Duplicate</button><button data-command="delete">Delete</button><button data-command="reset">Reset Changes</button><button data-command="defaults">Restore Default</button><button data-command="save">Save Template</button></div>
         <div class="studio-tools"><label>Name <input id="templateName" value="${esc(draft.name)}" maxlength="80"></label><label>Use for <select id="templateKind"><option value="workstation">Workstation</option><option value="peripheral">Peripheral</option></select></label><label>Size <select id="presetSize"><option value="custom">Custom</option><option value="a6">A6 · 105 × 148</option><option value="a7">A7 · 105 × 74</option></select></label><label>Width <input id="templateWidth" type="number" min="30" max="297" value="${draft.width}"></label><label>Height <input id="templateHeight" type="number" min="30" max="297" value="${draft.height}"></label><label>Background <input id="templateBackground" type="color" value="${color(draft.background,'#ffffff')}"></label></div>
         <div class="studio-tools">${['text','field','qr','logo','image'].map(type=>`<button data-add="${type}">Add ${type}</button>`).join('')}<input hidden id="studioImage" type="file" accept="image/png,image/jpeg,image/gif"><button data-command="preview">Print Preview</button></div>
         <label>Preview asset <select id="previewAsset"><option value="">Choose a real asset</option>${[...data.workstations.map(a=>['workstation',a.workstationTag]),...data.peripherals.map(a=>['peripheral',a.peripheralTag])].map(([kind,tag])=>`<option value="${esc(JSON.stringify([kind,tag]))}">${esc(tag)}</option>`).join('')}</select></label>
         <div class="studio-workspace"><div class="studio-stage-scroll"><div id="studioStage" tabindex="0" aria-label="Tag editor. Use arrow keys to move selected element."></div></div><aside id="studioInspector"></aside></div><p class="muted">Templates use the same renderer as printed tags. Standard tags scale proportionally to fit safe A4 printer margins.</p></div>`;
+        pane.querySelector('#showManufacturer').onchange=async e=>{
+            const input=e.target;input.disabled=true;
+            let saved={};try{saved=JSON.parse(data.settings.tagConfig||'{}');}catch(_){}
+            const tagConfig=JSON.stringify({...saved,showManufacturer:input.checked});
+            try{await api('/api/settings',{method:'POST',body:{tagConfig}});data.settings.tagConfig=tagConfig;if(editorAsset)editorAsset=asset(editorAsset.kind,editorAsset.tag);draw();showToast('Product brand setting saved','success');}catch(_){input.checked=getTagConfig().showManufacturer;}finally{input.disabled=false;}
+        };
         pane.querySelector('#templateKind').value=draft.kind;
         pane.querySelector('#templateSelect').onchange=e=>{if(!confirm('Switch template and discard unsaved edits?')){e.target.value=active;return;}active=e.target.value;draft=clone(templates.find(t=>t.id===active));selectedElement=draft.elements[0]?.id;renderEditor();};
         for(const [id,key] of [['templateName','name'],['templateWidth','width'],['templateHeight','height'],['templateBackground','background'],['templateKind','kind']]) pane.querySelector('#'+id).onchange=e=>{draft[key]=['width','height'].includes(key)?Math.max(30,Math.min(297,number(e.target.value,105))):e.target.value;boundAll();draw();};

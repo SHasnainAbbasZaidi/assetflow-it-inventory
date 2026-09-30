@@ -81,12 +81,7 @@ class _WorkstationsViewState extends State<WorkstationsView> {
     if (selectedTags.isEmpty) return;
 
     try {
-      final pdfBytes = await TagPdfService.generateBulkTagsPdf(
-        tags: selectedTags,
-        companyName: provider.companyName,
-        companyLogo: provider.companyLogo,
-        config: provider.tagConfig,
-      );
+      final pdfBytes = await TagPdfService.buildTagsPdf(provider:provider,assetIds:_selectedAssetIds.toList());
       await saveAndLaunchFile(pdfBytes, 'bulk_tags.pdf', mimeType: 'application/pdf');
     } catch (e) {
       if (context.mounted) {

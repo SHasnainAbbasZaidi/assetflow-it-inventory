@@ -8,6 +8,7 @@ class AssetTag {
   final String modelName;
   final int quantity;
   final String vendorName;
+  final String productBrand;
   final String requestedBy;
   final String purchaseCost;
   final String warrantyExpiry;
@@ -31,6 +32,7 @@ class AssetTag {
     required this.modelName,
     required this.quantity,
     required this.vendorName,
+    this.productBrand = '',
     required this.requestedBy,
     required this.purchaseCost,
     required this.warrantyExpiry,
@@ -56,6 +58,7 @@ class AssetTag {
       'modelName': modelName,
       'quantity': quantity,
       'vendorName': vendorName,
+      'productBrand': productBrand,
       'requestedBy': requestedBy,
       'purchaseCost': purchaseCost,
       'warrantyExpiry': warrantyExpiry,
@@ -82,6 +85,7 @@ class AssetTag {
       modelName: map['modelName'] ?? '',
       quantity: map['quantity'] ?? 1,
       vendorName: map['vendorName'] ?? '',
+      productBrand: map['productBrand'] ?? '',
       requestedBy: map['requestedBy'] ?? '',
       purchaseCost: map['purchaseCost'] ?? '',
       warrantyExpiry: map['warrantyExpiry'] ?? '',
@@ -107,6 +111,7 @@ class AssetTag {
     String? modelName,
     int? quantity,
     String? vendorName,
+    String? productBrand,
     String? requestedBy,
     String? purchaseCost,
     String? warrantyExpiry,
@@ -130,6 +135,7 @@ class AssetTag {
       modelName: modelName ?? this.modelName,
       quantity: quantity ?? this.quantity,
       vendorName: vendorName ?? this.vendorName,
+      productBrand: productBrand ?? this.productBrand,
       requestedBy: requestedBy ?? this.requestedBy,
       purchaseCost: purchaseCost ?? this.purchaseCost,
       warrantyExpiry: warrantyExpiry ?? this.warrantyExpiry,

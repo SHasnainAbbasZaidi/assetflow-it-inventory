@@ -1295,13 +1295,14 @@ function nextAssetTag(kind) {
 function getTagConfig() {
     let config = {};
     try { config = JSON.parse(data.settings.tagConfig || '{}'); } catch (_) {}
-    return { showCompany: config.showCompany !== false, showUser: config.showUser !== false,
+    if(!config || typeof config!=='object')config={};
+    return { showManufacturer: config.showManufacturer !== false, showCompany: config.showCompany !== false, showUser: config.showUser !== false,
         showDeviceName: config.showDeviceName !== false, qrSize: Math.max(50, Math.min(120, Number(config.qrSize) || 70)) };
 }
 
 async function saveTagDesign(event) {
     event.preventDefault();
-    const config = {};
+    const config = getTagConfig();
     for (const key of ['showCompany', 'showUser', 'showDeviceName']) config[key] = document.getElementById(key).checked;
     config.qrSize = Number(document.getElementById('tagQrSize').value);
     try {

@@ -9,6 +9,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 class TagPdfService {
+  static String headingFor(AssetTag tag,Map<String,dynamic> config,bool workstation) => config['showManufacturer']!=false && tag.productBrand.trim().isNotEmpty?tag.productBrand.trim():(workstation?'Device Details':'Peripheral Tag');
   static Future<Uint8List> generateBulkTagsPdf({
     required List<AssetTag> tags,
     required String companyName,
@@ -24,6 +25,8 @@ class TagPdfService {
       for (var offset = 0; offset < group.length; offset += perPage) {
         final chunk = group.skip(offset).take(perPage).toList();
         pw.Widget label(AssetTag tag) {
+          final heading=headingFor(tag,config,workstation);
+          if(heading.length>34)throw FormatException('Product brand is too long for this compact tag. Use a larger custom template.');
           final fields = ['CPU: ${tag.cpu}', 'Motherboard: ${tag.motherboard}', 'RAM: ${tag.ram}', 'Storage: ${tag.storage}', 'GPU: ${tag.gpu}'];
           // Refuse unreadably dense labels; no whole-label shrinking or clipped text.
           if (tag.tagNumber.length > 66 || tag.username.length > 66 || (workstation && fields.fold<int>(0, (n,v) => n + (v.length /  fiftyChars).ceil()) > 8)) {
@@ -35,7 +38,7 @@ class TagPdfService {
             child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
               pw.Row(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
                 pw.Expanded(child:pw.Column(crossAxisAlignment:pw.CrossAxisAlignment.start,children:[
-                  pw.Text(workstation?'Device Details':'Peripheral Tag',style:pw.TextStyle(fontSize:10,fontWeight:pw.FontWeight.bold,color:PdfColors.blue700)),
+                  pw.Text(heading,style:pw.TextStyle(fontSize:10,fontWeight:pw.FontWeight.bold,color:PdfColors.blue700)),
                   pw.SizedBox(height:5),
                   pw.Text('Tag No: ${tag.tagNumber}',style:const pw.TextStyle(fontSize:8)),
                   pw.SizedBox(height:5),
@@ -104,9 +107,11 @@ class TagPdfService {
     final fallbackPurchaseDate =
         asset.customFields['purchaseDate']?.toString() ?? asset.dateAdded;
 
-    if (tag != null) return tag;
+    final brand=['brandManufacturer','manufacturer','brand','productBrand'].map((key)=>asset.customFields[key]?.toString().trim()??'').firstWhere((value)=>value.isNotEmpty,orElse:()=>tag?.productBrand??'');
+    if (tag != null) return tag.copyWith(productBrand:brand);
 
     return AssetTag(
+      productBrand:brand,
       id: 'fallback-${asset.id}',
       tagNumber: asset.serial.isNotEmpty ? asset.serial : asset.id,
       assetId: asset.id,
