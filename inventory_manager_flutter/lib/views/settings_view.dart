@@ -183,8 +183,11 @@ class _SettingsViewState extends State<SettingsView> {
                     onChanged: (i) => setState(() => _category = i ?? 0))),
           panels[_category < panels.length ? _category : 0],
           const SizedBox(height: 24),
-          const Text('A product of Mahzaidex Tech\nDeveloped by Hasnain Zaidi',
-              style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF))),
+          Center(child: Image.asset('assets/images/mahzaidex-tech.png',
+              width: 140, semanticLabel: 'Mahzaidex Tech', fit: BoxFit.contain)),
+          const Center(child: Text('Developed by Hasnain Zaidi',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)))),
         ]);
         return Row(children: [
           if (!compact)

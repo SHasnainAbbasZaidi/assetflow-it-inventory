@@ -60,3 +60,6 @@ Thumbs.db
 /inventory_manager_flutter/build_log*.txt
 
 .assetflow-ai.key
+
+# Kotlin compiler cache inside the mobile project
+/inventory_manager_flutter/android/.kotlin/

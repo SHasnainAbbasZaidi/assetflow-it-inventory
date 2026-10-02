@@ -24,13 +24,13 @@ class _AssetCameraState extends State<AssetCamera> {
           final code = capture.barcodes.firstOrNull?.rawValue;
           if (code != null) widget.onCode(code);
         },
-        errorBuilder: (_, error, __) => Center(
+        errorBuilder: (_, error) => Center(
             child: Padding(
           padding: const EdgeInsets.all(12),
           child: Text(
               error.errorCode == MobileScannerErrorCode.permissionDenied
                   ? 'Allow camera access in Android Settings → Apps → AssetFlow → Permissions, then return and tap Retry camera.'
-                  : 'Camera could not start. Close other camera apps and tap Retry camera. Manual tag entry is available below.',
+                  : 'Camera could not start (${error.errorCode.name}). Close other camera apps and tap Retry camera. Manual tag entry is available below.',
               textAlign: TextAlign.center),
         )),
       )),

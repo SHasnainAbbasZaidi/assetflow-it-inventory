@@ -182,7 +182,7 @@ class _DashboardViewState extends State<DashboardView> {
                                 style: Theme.of(context).textTheme.titleMedium),
                             const SizedBox(height: 8),
                             Text(
-                                'Owner: ${asset.assignee.isEmpty ? 'Unassigned' : asset.assignee}'),
+                                'Owner: ${(asset.customFields['ownerName']?.toString().isNotEmpty ?? false) ? asset.customFields['ownerName'] : asset.assignee.isEmpty ? 'Unassigned' : asset.assignee}'),
                             const SizedBox(height: 12),
                             Wrap(spacing: 8, runSpacing: 8, children: [
                               OutlinedButton.icon(

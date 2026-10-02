@@ -231,6 +231,7 @@ class InventoryProvider extends ChangeNotifier {
         status: _mapStatus(p['status'] ?? ''),
         assignee: p['workstationTag'] ?? '',
         customFields: editableAssetFields(p, {
+          'ownerName': p['personnel']?['fullName'] ?? p['workstation']?['personnel']?['fullName'] ?? p['workstation']?['userName'] ?? '',
           'model': p['modelSpecs'],
           'deviceType': p['brandManufacturer'],
           'storage': p['storageCapacity'],
@@ -332,7 +333,8 @@ class InventoryProvider extends ChangeNotifier {
         'peripheralTag': id,
         'category': category,
         'modelSpecs': customFields['model'],
-        'workstationTag': assignee.isEmpty ? null : assignee,
+        'workstationTag': assignee.isEmpty || assignee.startsWith('person:') ? null : assignee,
+        'personnelId': assignee.startsWith('person:') ? assignee.substring(7) : null,
         'brandManufacturer': customFields['deviceType'],
         'storageCapacity': customFields['storage'],
         'gpuSpecs': customFields['gpu'],
@@ -381,7 +383,8 @@ class InventoryProvider extends ChangeNotifier {
       await api.updatePeripheral(id, {
         'category': category,
         'modelSpecs': customFields['model'],
-        'workstationTag': assignee.isEmpty ? null : assignee,
+        'workstationTag': assignee.isEmpty || assignee.startsWith('person:') ? null : assignee,
+        'personnelId': assignee.startsWith('person:') ? assignee.substring(7) : null,
         'brandManufacturer': customFields['deviceType'],
         'storageCapacity': customFields['storage'],
         'gpuSpecs': customFields['gpu'],

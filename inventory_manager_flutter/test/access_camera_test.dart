@@ -27,6 +27,7 @@ class FakeCamera extends MobileScannerPlatform {
       throw const MobileScannerException(
           errorCode: MobileScannerErrorCode.permissionDenied);
     return const MobileScannerViewAttributes(
+        cameraDirection: CameraFacing.back,
         currentTorchMode: TorchState.off,
         size: Size(640, 480),
         numberOfCameras: 1);

@@ -130,7 +130,9 @@ class AssignmentDialog extends StatefulWidget {
 }
 
 class _AssignmentDialogState extends State<AssignmentDialog> {
-  List<dynamic> _people = [];
+  List<dynamic> _people = [], _workstations = [];
+  bool _toWorkstation = false;
+  List<dynamic> get _targets => _toWorkstation ? _workstations : _people;
   String _query = '';
   String? _personId, _error, _assignedName;
   bool _loading = true, _saving = false, _confirm = false, _done = false;
@@ -160,11 +162,21 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
           await AssetApiService(token: context.read<AuthProvider>().apiToken!)
               .getPersonnel()
               .timeout(const Duration(seconds: 12));
-      if (mounted) setState(() => _people = people);
+      final workstations = widget.result.type == 'peripheral'
+          ? await AssetApiService(token: context.read<AuthProvider>().apiToken!).getWorkstations().timeout(const Duration(seconds: 12))
+          : <dynamic>[];
+      if (mounted) setState(() {
+        _people = people;
+        _workstations = workstations.where((w) => !['RETIRED','OUT_OF_ORDER','SCRAPPED'].contains(w['status'])).map((w) => {
+          'id': w['workstationTag'],
+          'fullName': w['workstationTag'].toString() + ' — ' + (w['personnel']?['fullName'] ?? w['userName'] ?? 'Unassigned').toString(),
+          'department': w['deviceType'] ?? 'Workstation',
+        }).toList();
+      });
     } catch (_) {
       if (mounted)
         setState(() =>
-            _error = 'Cannot load people. Check your connection and retry.');
+            _error = 'Cannot load assignment choices. Check your connection and retry.');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -181,14 +193,14 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
     try {
       final response =
           await AssetApiService(token: token).assign(widget.result.type, _tag, {
-        'personnelId': _personId,
+        if (_toWorkstation) 'workstationTag': _personId else 'personnelId': _personId,
         'expectedState': widget.result.data['assignmentState'],
         'allowReassign': _confirm
       }).timeout(const Duration(seconds: 15));
       if (!mounted) return;
       setState(() {
         _done = true;
-        _assignedName = response['person']['fullName'];
+        _assignedName = _toWorkstation ? response['workstation']['workstationTag'] : response['person']['fullName'];
       });
       try {
         await inventory
@@ -217,7 +229,7 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
         item['workstation']?['personnel']?['fullName'] ??
         item['userName'] ??
         'Unassigned';
-    final matches = _people
+    final matches = _targets
         .where((p) => '${p['fullName']} ${p['department'] ?? ''}'
             .toLowerCase()
             .contains(_query.trim().toLowerCase()))
@@ -266,21 +278,28 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
                               'Restore this item to service before assigning.',
                               style: TextStyle(color: Colors.orangeAccent)),
                         const SizedBox(height: 16),
+                        if (widget.result.type == 'peripheral')
+                          DropdownButtonFormField<bool>(
+                            value: _toWorkstation,
+                            decoration: const InputDecoration(labelText: 'Assign to'),
+                            items: const [DropdownMenuItem(value: false, child: Text('Person')), DropdownMenuItem(value: true, child: Text('Workstation'))],
+                            onChanged: _saving ? null : (value) => setState(() { _toWorkstation = value ?? false; _personId = null; _query = ''; }),
+                          ),
                         if (_loading) const LinearProgressIndicator(),
                         TextField(
+                            key: ValueKey(_toWorkstation),
                             enabled: !_saving,
-                            decoration: const InputDecoration(
-                                labelText: 'Search people',
+                            decoration: InputDecoration(
+                                labelText: _toWorkstation ? 'Search workstation tag or owner' : 'Search people',
                                 prefixIcon: Icon(Icons.person_search)),
                             onChanged: (v) => setState(() => _query = v)),
                         if (_personId != null)
                           Padding(
                               padding: const EdgeInsets.symmetric(vertical: 8),
                               child: Text(
-                                  'Selected: ${_people.firstWhere((p) => p['id'] == _personId)['fullName']}')),
+                                  'Selected: ${_targets.firstWhere((p) => p['id'] == _personId)['fullName']}')),
                         if (!_loading && matches.isEmpty)
-                          const Text(
-                              'No people found. Add a person in Personnel first.'),
+                          Text(_toWorkstation ? 'No workstations found.' : 'No people found. Add a person in Personnel first.'),
                         ...matches.map((p) => ListTile(
                             selected: _personId == p['id'],
                             leading: Icon(_personId == p['id']
@@ -316,7 +335,7 @@ class _AssignmentDialogState extends State<AssignmentDialog> {
                             (_assigned && !_confirm)
                         ? null
                         : _assign,
-                    child: Text(_saving ? 'Saving…' : 'Assign to person')),
+                    child: Text(_saving ? 'Saving…' : _toWorkstation ? 'Assign to workstation' : 'Assign to person')),
             ]));
   }
 }

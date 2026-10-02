@@ -1,5 +1,14 @@
 # Release notes
 
+## 1.2.2 — 2026-10-02
+
+- Upgrade the Android scanner to mobile_scanner 7.4.2 with native startup, camera session cleanup, resume, and release-build barcode fixes. Camera errors now include their error code.
+- Allow scanned peripherals, devices, and components to be assigned to a person or workstation. Show workstation tags alongside owner names; workstations themselves remain assignable to people.
+- Add people to mobile item-edit assignment choices and preserve direct ownership through server create/edit operations. Reject conflicting owners and retain reassignment confirmation and stale-scan protection.
+- Include the smaller Mahzaidex Tech logo and developer credit only on Login and Settings, plus manufacturer tag settings and dropdown theme fixes.
+- Android version 1.2.2 (build 5). Install over the existing app to retain the Server URL and login state. Update the server from main before using workstation scan assignments.
+- Automated server and mobile regressions passed. Physical Android camera validation remains required; no Android device was connected during this build.
+
 ## 1.2.1 — 2026-09-28
 
 - Restore web Status / Assign actions in all hardware categories using the same assignment API as Android. Keep assignment status consistent when saving ownership through edit forms.

@@ -1270,3 +1270,10 @@ tr:hover td {
     outline: 2px solid var(--accent);
     outline-offset: 2px;
 }
+
+/* Keep the supplied brand artwork and developer credit aligned. */
+.brand-credit { display:flex; flex-direction:column; align-items:center; gap:2px; text-align:center; }
+.brand-credit img { display:block; width:140px; max-width:100%; height:auto; object-fit:contain; }
+
+.brand-credit { font-size:10px; color:var(--text-secondary); line-height:1.4; }
+.login-credit { margin-top:18px; }

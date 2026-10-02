@@ -55,6 +55,7 @@ const workstationSchema = z.object({
 });
 
 const peripheralSchema = z.object({
+  personnelId: z.string().trim().optional().nullable(),
   peripheralTag: z.string().trim().min(1),
   category: z.string().trim().optional().nullable(),
   modelSpecs: z.string().trim().optional().nullable(),
@@ -471,6 +472,8 @@ app.get('/api/peripherals', requireAuth, requirePermission('view'), async (req, 
 app.post('/api/peripherals', requireAuth, requirePermission('add'), async (req, res) => {
   const data = parsed(peripheralSchema, req.body);
   const { peripheralTag, workstationTag, customFields, ...fields } = data;
+  if(workstationTag && fields.personnelId)throw httpError(400,'Choose a person or workstation, not both.');
+  if(fields.personnelId && !await prisma.personnel.findUnique({where:{id:fields.personnelId}}))throw httpError(409,'Referenced person does not exist.');
   if (workstationTag && !await prisma.workstation.findUnique({ where: { workstationTag } })) {
     throw httpError(409, 'Referenced Workstation Tag does not exist.', 'INVALID_WORKSTATION_REFERENCE');
   }
@@ -481,7 +484,7 @@ app.post('/api/peripherals', requireAuth, requirePermission('add'), async (req, 
         workstationTag: workstationTag || null,
         ...fields,
         customFields: serializeCustomFields(customFields),
-        status: workstationTag ? 'ASSIGNED' : 'IN_STORE',
+        status: workstationTag || fields.personnelId ? 'ASSIGNED' : 'IN_STORE',
         quantity: fields.quantity ?? 1,
       }
     });
@@ -497,7 +500,11 @@ app.patch('/api/peripherals/:tag', requireAuth, requirePermission('edit'), async
   if (fields.workstationTag && !await prisma.workstation.findUnique({ where: { workstationTag: fields.workstationTag } })) {
     throw httpError(409, 'Referenced Workstation Tag does not exist.', 'INVALID_WORKSTATION_REFERENCE');
   }
+  if(fields.workstationTag && fields.personnelId)throw httpError(400,'Choose a person or workstation, not both.');
+  if(fields.personnelId && !await prisma.personnel.findUnique({where:{id:fields.personnelId}}))throw httpError(409,'Referenced person does not exist.');
   const updateData = { ...fields };
+  if(fields.personnelId !== undefined)updateData.personnelId=fields.personnelId||null;
+  if(fields.personnelId)updateData.workstationTag=null;
   if (fields.workstationTag !== undefined) updateData.workstationTag = fields.workstationTag || null;
   if (fields.workstationTag) updateData.personnelId = null;
   if (customFields !== undefined) updateData.customFields = serializeCustomFields(customFields);
@@ -505,9 +512,9 @@ app.patch('/api/peripherals/:tag', requireAuth, requirePermission('edit'), async
   const asset = await prisma.$transaction(async tx => {
     const existing=await tx.peripheral.findUnique({where:{peripheralTag:req.params.tag}});
     if(!existing)throw httpError(404,'Peripheral not found.');
-    if(updateData.workstationTag!==undefined && updateData.workstationTag!==existing.workstationTag){
+    if((updateData.workstationTag!==undefined && updateData.workstationTag!==existing.workstationTag)||(updateData.personnelId!==undefined && updateData.personnelId!==existing.personnelId)){
       if(['RETIRED','SCRAPPED','OUT_OF_ORDER'].includes(existing.status))throw httpError(409,'Return this item to service before changing its assignment.');
-      updateData.status=updateData.workstationTag||existing.personnelId?'ASSIGNED':'IN_STORE';
+      updateData.status=(updateData.workstationTag!==undefined?updateData.workstationTag:existing.workstationTag)||(updateData.personnelId!==undefined?updateData.personnelId:existing.personnelId)?'ASSIGNED':'IN_STORE';
     }
     const updated = await tx.peripheral.update({
       where: { peripheralTag: req.params.tag },

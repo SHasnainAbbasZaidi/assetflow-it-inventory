@@ -302,7 +302,7 @@ class _PeripheralsViewState extends State<PeripheralsView> {
                                       ),
                                     ),
                                     DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text(asset.category))),
-                                    DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text(asset.customFields['personnel']?['fullName']?.toString() ?? (asset.assignee.isEmpty ? 'Unassigned' : asset.assignee)))),
+                                    DataCell(Opacity(opacity: isRetired ? 0.6 : 1.0, child: Text((asset.customFields['ownerName']?.toString().isNotEmpty ?? false) ? asset.customFields['ownerName'].toString() : (asset.assignee.isEmpty ? 'Unassigned' : asset.assignee)))),
                                     DataCell(
                                       Container(
                                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -408,7 +408,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
     _name = widget.asset?.name ?? '';
     _category = widget.asset?.category ?? widget.category;
     _status = widget.asset?.status ?? 'In Store';
-    _assignee = widget.asset?.assignee ?? '';
+    _assignee = widget.asset?.customFields['personnelId'] != null ? 'person:' + widget.asset!.customFields['personnelId'].toString() : widget.asset?.assignee ?? '';
     _customFields = Map<String, dynamic>.from(widget.asset?.customFields ?? {});
   }
 
@@ -466,6 +466,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
               children: [
                 DropdownButtonFormField<String>(
                   value: _category.isEmpty ? null : _category,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Peripheral Type'),
                   items: {...AssetCategorySchemas.categories, _category}.map((cat) {
                     return DropdownMenuItem<String>(value: cat, child: Text(cat));
@@ -483,6 +484,7 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _status,
+                  isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Status'),
                   items: const [
                     DropdownMenuItem(value: 'In Store', child: Text('In Store')),
@@ -496,14 +498,16 @@ class _AssetFormDialogState extends State<AssetFormDialog> {
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
                   value: _assignee.isEmpty ? '' : _assignee,
-                  decoration: const InputDecoration(labelText: 'Assigned To (Workstation Tag)'),
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Assigned To (Person or Workstation)'),
                   items: [
                     const DropdownMenuItem(value: '', child: Text('Unassigned')),
+                    ...provider.personnel.map((p) => DropdownMenuItem(value: 'person:' + p.id, child: Text('Person: ' + p.fullName, overflow: TextOverflow.ellipsis))),
                     ...provider.workstations.map((w) {
-                      return DropdownMenuItem(value: w.id, child: Text(w.id));
+                      return DropdownMenuItem(value: w.id, child: Text('Workstation: ' + w.id + (w.assignee.isEmpty ? '' : ' — ' + w.assignee), overflow: TextOverflow.ellipsis));
                     }),
                   ],
-                  onChanged: (val) => setState(() => _assignee = val ?? ''),
+                  onChanged: (val) => setState(() { _assignee = val ?? ''; _status = _assignee.isEmpty ? 'In Store' : 'Assigned'; }),
                   onSaved: (val) => _assignee = val ?? '',
                 ),
                 if (coreFields.isNotEmpty || dynamicFields.isNotEmpty) ...[

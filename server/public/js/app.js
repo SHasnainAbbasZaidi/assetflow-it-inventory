@@ -1017,7 +1017,7 @@ function renderSettings(container) {
     `;
 
     renderSettingsSubPane();
-    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits">A product of Mahzaidex Tech<br>Developed by Hasnain Zaidi</footer>');
+    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits brand-credit"><img src="/images/mahzaidex-tech.png" alt="Mahzaidex Tech"><span>Developed by Hasnain Zaidi</span></footer>');
 }
 
 function switchSettingsSubTab(subTab) {
