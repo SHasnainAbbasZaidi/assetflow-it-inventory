@@ -28,3 +28,9 @@ test('invalid old configuration falls back safely', () => {
   vm.runInContext("data.settings.tagConfig = 'invalid'", c);
   assert.equal(vm.runInContext('getTagConfig().showCompany', c), true);
 });
+
+test('audit timestamps include local time and tolerate invalid historical values',()=>{
+  const c=context();
+  assert.equal(vm.runInContext("formatLogTimestamp('invalid')",c),'—');
+  assert.match(vm.runInContext("formatLogTimestamp('2026-10-02T10:20:30Z')",c),/:\d{2}:\d{2}/);
+});

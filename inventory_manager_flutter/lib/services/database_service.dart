@@ -279,6 +279,16 @@ class InventoryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> refreshLogs({bool older = false}) async {
+    if (_token == null) throw const AssetApiException('Sign in to refresh logs.');
+    final rows=await AssetApiService(token:_token!).getLogs(before:older && _logs.isNotEmpty?_logs.last.id:null).timeout(const Duration(seconds:15));
+    final loaded=rows.map((e)=>ActivityLog(id:e['logId']??'',timestamp:e['timestamp']??'',user:e['userEmail']??'System',action:e['actionTaken']??'',assetId:e['assetTag']??'',details:'')).toList();
+    final ids=_logs.map((e)=>e.id).toSet();
+    _logs=older?[..._logs,...loaded.where((e)=>!ids.contains(e.id))]:loaded;
+    notifyListeners();
+    return loaded.length==200;
+  }
+
   String _generateShortId() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();

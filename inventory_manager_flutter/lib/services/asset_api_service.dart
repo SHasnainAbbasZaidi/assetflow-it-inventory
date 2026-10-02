@@ -160,8 +160,8 @@ class AssetApiService {
       await _get('/api/peripherals') as List<dynamic>;
   Future<List<dynamic>> getUsers() async =>
       await _get('/api/users') as List<dynamic>;
-  Future<List<dynamic>> getLogs() async =>
-      await _get('/api/logs') as List<dynamic>;
+  Future<List<dynamic>> getLogs({String? before}) async =>
+      await _get('/api/logs'+(before==null?'':'?before='+Uri.encodeComponent(before))) as List<dynamic>;
   Future<Map<String, dynamic>> getSettings() async =>
       await _get('/api/settings') as Map<String, dynamic>;
   Future<Map<String, dynamic>> assign(

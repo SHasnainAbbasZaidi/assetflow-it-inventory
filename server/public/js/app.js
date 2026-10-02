@@ -1017,7 +1017,7 @@ function renderSettings(container) {
     `;
 
     renderSettingsSubPane();
-    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits brand-credit"><img src="/images/mahzaidex-tech.png" alt="Mahzaidex Tech"><span>Developed by Hasnain Zaidi</span></footer>');
+    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits brand-credit"><img class="signature-logo" src="/images/hasnain-zaidi.png?v=2" alt="Hasnain Zaidi"><img src="/images/mahzaidex-tech.png" alt="Mahzaidex Tech"></footer>');
 }
 
 function switchSettingsSubTab(subTab) {
@@ -1519,7 +1519,7 @@ function renderLogs(container) {
                 <p>Immutable system audit trail and asset lifecycle history</p>
             </div>
             <div class="header-controls">
-                <button class="btn btn-secondary" onclick="refreshData()"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
+                <button class="btn btn-secondary" onclick="loadLogPage(this, true)"><i class="ph ph-arrows-clockwise"></i> Refresh</button>
             </div>
         </div>
 
@@ -1538,17 +1538,18 @@ function renderLogs(container) {
                     <tbody>
                         ${data.logs.map(l => `
                             <tr>
-                                <td style="white-space: nowrap; font-size: 12px;">${formatDate(l.timestamp)}</td>
+                                <td style="white-space: nowrap; font-size: 12px;">${formatLogTimestamp(l.timestamp)}</td>
                                 <td style="font-weight: 500; color: var(--text-primary);">${escapeHtml(l.actionTaken)}</td>
                                 <td>${l.assetTag ? `<span class="tag-badge" style="color: var(--accent); cursor: pointer;" onclick="lookupAsset('${escapeHtml(l.assetTag)}')">${escapeHtml(l.assetTag)}</span>` : '<span style="color: var(--text-muted);">—</span>'}</td>
                                 <td>${escapeHtml(l.userEmail || 'System')}</td>
-                                <td><span style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${escapeHtml(l.logId.substring(0, 8))}...</span></td>
+                                <td><span style="font-family: monospace; font-size: 11px; color: var(--text-muted);">${escapeHtml(String(l.logId || '').substring(0, 8))}...</span></td>
                             </tr>
                         `).join('') || '<tr><td colspan="5" style="text-align: center; padding: 32px;">No logs recorded</td></tr>'}
                     </tbody>
                 </table>
             </div>
         </div>
+        <button class="btn btn-secondary" onclick="loadLogPage(this, false)">Load older logs</button>
     `;
 }
 
@@ -2057,4 +2058,22 @@ function formatDate(d) {
     } catch {
         return String(d);
     }
+}
+
+function formatLogTimestamp(value) {
+    if(!value)return '—';
+    const date=new Date(value);
+    return Number.isNaN(date.getTime())?'—':date.toLocaleString(undefined,{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+async function loadLogPage(button, refresh) {
+    button.disabled=true;
+    try {
+        const before=!refresh?data.logs.at(-1)?.logId:null;
+        const rows=await api('/api/logs'+(before?'?before='+encodeURIComponent(before):''));
+        const seen=new Set(refresh?[]:data.logs.map(row=>row.logId));
+        data.logs=refresh?rows:[...data.logs,...rows.filter(row=>!seen.has(row.logId))];
+        if(currentTab==='logs')renderLogs(document.getElementById('viewContainer'));
+        if(!refresh && !rows.length)showToast('All available logs are loaded','info');
+    } catch (_) { showToast('Could not refresh logs. Existing entries are preserved.','error'); }
+    finally { button.disabled=false; }
 }

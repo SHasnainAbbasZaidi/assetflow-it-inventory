@@ -3,9 +3,24 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:inventory_manager_flutter/services/database_service.dart';
 
-class LogsView extends StatelessWidget {
+class LogsView extends StatefulWidget {
   const LogsView({super.key});
 
+  @override
+  State<LogsView> createState()=>_LogsViewState();
+}
+class _LogsViewState extends State<LogsView> {
+  bool _loading=false, _more=true;
+  String? _error;
+  @override
+  void initState(){super.initState();WidgetsBinding.instance.addPostFrameCallback((_) {if(mounted)_refresh();});}
+  Future<void> _refresh({bool older=false}) async {
+    if(_loading)return;
+    setState((){_loading=true;_error=null;});
+    try{final more=await context.read<InventoryProvider>().refreshLogs(older:older);if(mounted)setState(()=>_more=more);}
+    catch(_){if(mounted)setState(()=>_error='Could not load logs. Existing entries are preserved. Retry when connected.');}
+    finally{if(mounted)setState(()=>_loading=false);}
+  }
   @override
   Widget build(BuildContext context) {
     final provider = Provider.of<InventoryProvider>(context);
@@ -27,7 +42,13 @@ class LogsView extends StatelessWidget {
               'Audit trail of all asset modifications and system events.',
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 24),
+            Wrap(spacing:8,children:[
+              TextButton.icon(onPressed:_loading?null:()=>_refresh(),icon:const Icon(Icons.refresh),label:const Text('Refresh logs')),
+              if(_more)TextButton(onPressed:_loading?null:()=>_refresh(older:true),child:const Text('Load older logs')),
+            ]),
+            if(_loading)const LinearProgressIndicator(),
+            if(_error!=null)Text(_error!,style:const TextStyle(color:Colors.orangeAccent)),
+            const SizedBox(height: 12),
             Expanded(
               child: Card(
                 child: logs.isEmpty
@@ -51,9 +72,8 @@ class LogsView extends StatelessWidget {
                                 DataColumn(label: Text('ACTION')),
                                 DataColumn(label: Text('ASSET ID')),
                                 DataColumn(label: Text('USER')),
-                                DataColumn(label: Text('DETAILS')),
                               ],
-                              rows: logs.take(100).map((log) {
+                              rows: logs.map((log) {
                                 DateTime? parsedDate = DateTime.tryParse(log.timestamp);
                                 String formattedTime = parsedDate != null 
                                     ? DateFormat.yMd().add_jms().format(parsedDate.toLocal())
@@ -83,7 +103,6 @@ class LogsView extends StatelessWidget {
                                       ),
                                     ),
                                     DataCell(Text(log.user)),
-                                    DataCell(Text(log.details)),
                                   ],
                                 );
                               }).toList(),

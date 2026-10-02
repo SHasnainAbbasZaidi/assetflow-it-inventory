@@ -1,3 +1,4 @@
+import '../widgets/brand_credit.dart';
 import 'ai_settings_view.dart';
 import 'admin_tools_view.dart';
 import 'dart:convert';
@@ -183,11 +184,7 @@ class _SettingsViewState extends State<SettingsView> {
                     onChanged: (i) => setState(() => _category = i ?? 0))),
           panels[_category < panels.length ? _category : 0],
           const SizedBox(height: 24),
-          Center(child: Image.asset('assets/images/mahzaidex-tech.png',
-              width: 140, semanticLabel: 'Mahzaidex Tech', fit: BoxFit.contain)),
-          const Center(child: Text('Developed by Hasnain Zaidi',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)))),
+          const BrandCredit(),
         ]);
         return Row(children: [
           if (!compact)

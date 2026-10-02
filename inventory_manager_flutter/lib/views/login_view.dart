@@ -1,3 +1,4 @@
+import '../widgets/brand_credit.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -255,11 +256,8 @@ class _LoginViewState extends State<LoginView> {
                                         fontWeight: FontWeight.w600)),
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        Center(child: Image.asset('assets/images/mahzaidex-tech.png',
-                            width: 140, semanticLabel: 'Mahzaidex Tech', fit: BoxFit.contain)),
-                        const Center(child: Text('Developed by Hasnain Zaidi',
-                            style: TextStyle(fontSize: 10, color: Color(0xFF9CA3AF)))),
+                        const SizedBox(height: 36),
+                        const BrandCredit(),
                       ],
                     ),
                   ),

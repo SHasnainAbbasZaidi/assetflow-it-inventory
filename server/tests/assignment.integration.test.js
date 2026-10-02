@@ -66,6 +66,22 @@ test('safe additive migration and assignment API service on an isolated database
       const created=await fetch(`${base}/api/peripherals`,{method:'POST',headers:writeHeaders,body:JSON.stringify({peripheralTag:id+'direct',category:'Mouse',personnelId:id+'a'})});
       assert.equal(created.status,201);
       assert.equal((await created.json()).status,'ASSIGNED');
+      const history=await prisma.auditLog.findMany({where:{assetTag:id+'p'}});
+      assert.ok(history.some(l=>l.actionTaken.includes('assignment: Test Person B → Workstation '+id)));
+      assert.ok(history.some(l=>l.actionTaken.includes('→ Test Person B; updated details')));
+      const createLog=await prisma.auditLog.findFirst({where:{assetTag:id+'direct'}});
+      assert.match(createLog.actionTaken,/Created peripheral; assigned to Test Person A/);
+      const editWs=await fetch(`${base}/api/workstations/${id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({personnelId:id+'b'})});
+      assert.equal(editWs.status,200);
+      const wsHistory=await prisma.auditLog.findMany({where:{assetTag:id}});
+      assert.ok(wsHistory.some(l=>l.actionTaken.includes('assignment: Test Person A → Test Person B')));
+      await fetch(`${base}/api/workstations/${id}`,{method:'PATCH',headers:writeHeaders,body:JSON.stringify({personnelId:id+'a'})});
+      await prisma.auditLog.createMany({data:Array.from({length:205},(_,i)=>({logId:id+'page'+String(i).padStart(3,'0'),timestamp:new Date('2099-01-01'),userEmail:'paging-test',actionTaken:'Paging test'}))});
+      const first=await (await fetch(`${base}/api/logs?user=paging-test`,{headers})).json();
+      assert.equal(first.length,200);
+      const second=await (await fetch(`${base}/api/logs?user=paging-test&before=${encodeURIComponent(first.at(-1).logId)}`,{headers})).json();
+      assert.equal(second.length,5);assert.equal(new Set([...first,...second].map(l=>l.logId)).size,205);
+      assert.equal((await fetch(`${base}/api/logs?from=invalid`,{headers})).status,400);
     } finally {await new Promise(resolve=>server.close(resolve));await apiPrisma.$disconnect();}
     const current=await prisma.peripheral.findUnique({where:{peripheralTag:id+'p'},include:{workstation:true}});
     await assert.rejects(assignAsset(prisma,'peripheral',id+'p',{workstationTag:id,expectedState:assignmentState(current)},'test'),{code:'CONFIRM_REASSIGN'});

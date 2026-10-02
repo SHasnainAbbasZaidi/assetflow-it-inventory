@@ -137,6 +137,18 @@ function parsed(schema, body) {
   return result.data;
 }
 
+
+async function ownerLabel(tx, item, kind) {
+  if(item.personnelId){const person=await tx.personnel.findUnique({where:{id:item.personnelId}});return person?.fullName || item.userName || item.personnelId;}
+  if(kind==='peripheral' && item.workstationTag){const ws=await tx.workstation.findUnique({where:{workstationTag:item.workstationTag},include:{personnel:true}});return 'Workstation '+item.workstationTag+(ws?.personnel?.fullName?' ('+ws.personnel.fullName+')':'');}
+  return item.userName || 'Unassigned';
+}
+async function auditAssetEdit(tx, email, tag, kind, before, after) {
+  const changed=(before.personnelId||null)!==(after.personnelId||null) || (kind==='peripheral' && (before.workstationTag||null)!==(after.workstationTag||null)) || (kind==='workstation' && (before.userName||null)!==(after.userName||null));
+  const action=changed?'Changed '+kind+' assignment: '+await ownerLabel(tx,before,kind)+' → '+await ownerLabel(tx,after,kind)+'; updated details':'Updated '+kind+' details';
+  return audit(tx,email,tag,action);
+}
+
 function audit(tx, userEmail, assetTag, actionTaken) {
   return tx.auditLog.create({
     data: {
@@ -406,7 +418,7 @@ app.post('/api/workstations', requireAuth, requirePermission('add'), async (req,
         status: assignedPersonnelId ? 'ASSIGNED' : 'IN_STORE',
       }
     });
-    await audit(tx, req.auth.email, workstationTag, 'Created workstation');
+    await audit(tx, req.auth.email, workstationTag, 'Created workstation; assigned to '+await ownerLabel(tx,created,'workstation'));
     return created;
   });
   res.status(201).json(asset);
@@ -452,7 +464,7 @@ app.patch('/api/workstations/:tag', requireAuth, requirePermission('edit'), asyn
       where: { workstationTag: req.params.tag },
       data: updateData,
     });
-    await audit(tx, req.auth.email, req.params.tag, 'Updated workstation details');
+    await auditAssetEdit(tx,req.auth.email,req.params.tag,'workstation',existing,updated);
     return updated;
   });
   res.json(asset);
@@ -488,7 +500,7 @@ app.post('/api/peripherals', requireAuth, requirePermission('add'), async (req, 
         quantity: fields.quantity ?? 1,
       }
     });
-    await audit(tx, req.auth.email, peripheralTag, 'Created peripheral');
+    await audit(tx, req.auth.email, peripheralTag, 'Created peripheral; assigned to '+await ownerLabel(tx,created,'peripheral'));
     return created;
   });
   res.status(201).json(asset);
@@ -520,7 +532,7 @@ app.patch('/api/peripherals/:tag', requireAuth, requirePermission('edit'), async
       where: { peripheralTag: req.params.tag },
       data: updateData,
     });
-    await audit(tx, req.auth.email, req.params.tag, 'Updated peripheral details');
+    await auditAssetEdit(tx,req.auth.email,req.params.tag,'peripheral',existing,updated);
     return updated;
   });
   res.json(asset);
@@ -717,18 +729,25 @@ app.delete('/api/users/:email', requireAuth, requireRole(['ADMIN']), async (req,
 // AUDIT LOGS ENDPOINTS
 // =====================================================================
 app.get('/api/logs', requireAuth, requirePermission('view'), async (req, res) => {
-  const { user, asset, from, to } = req.query;
+  const { user, asset, from, to, before } = req.query;
   const where = {};
   if (user) where.userEmail = { contains: String(user) };
   if (asset) where.assetTag = { contains: String(asset) };
   if (from || to) {
     where.timestamp = {};
     if (from) where.timestamp.gte = new Date(String(from));
+    if(from && Number.isNaN(where.timestamp.gte.getTime()))throw httpError(400,'Invalid start date.');
     if (to) where.timestamp.lte = new Date(String(to));
+    if(to && Number.isNaN(where.timestamp.lte.getTime()))throw httpError(400,'Invalid end date.');
+  }
+  if(before){
+    const cursor=await prisma.auditLog.findUnique({where:{logId:String(before)}});
+    if(!cursor)throw httpError(400,'Log cursor no longer exists. Refresh the logs.');
+    where.OR=[{timestamp:{lt:cursor.timestamp}},{timestamp:cursor.timestamp,logId:{lt:cursor.logId}}];
   }
   const logs = await prisma.auditLog.findMany({
     where,
-    orderBy: { timestamp: 'desc' },
+    orderBy: [{ timestamp: 'desc' },{logId:'desc'}],
     take: 200,
   });
   res.json(logs);
