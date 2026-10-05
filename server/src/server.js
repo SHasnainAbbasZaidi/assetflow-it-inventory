@@ -1,3 +1,4 @@
+import { createPeripheralBatch } from './services/batch-service.js';
 import {userAccess,saveAccess,accessKey,requirePermission} from './services/access-service.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
@@ -479,6 +480,13 @@ app.get('/api/peripherals', requireAuth, requirePermission('view'), async (req, 
     orderBy: { peripheralTag: 'asc' },
   });
   res.json(peripherals);
+});
+
+app.post('/api/peripherals/batch', requireAuth, requirePermission('add'), async (req,res)=>{
+  const input=parsed(z.object({quantity:z.number().int().min(1).max(100),tags:z.array(z.string().trim().min(1).max(200)).min(1).max(100).optional(),common:peripheralSchema.omit({peripheralTag:true,quantity:true}).strict()}),req.body);
+  if(input.tags && input.quantity!==input.tags.length)throw httpError(400,'Quantity must match the number of tag numbers.');
+  input.common.customFields=serializeCustomFields(input.common.customFields);
+  res.status(201).json(await createPeripheralBatch(prisma,input,req.auth.email));
 });
 
 app.post('/api/peripherals', requireAuth, requirePermission('add'), async (req, res) => {

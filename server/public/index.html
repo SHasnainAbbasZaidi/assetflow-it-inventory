@@ -45,7 +45,6 @@
                     <i class="ph ph-sign-in"></i> Sign In
                 </button>
             </form>
-            <div class="brand-credit login-credit"><img class="signature-logo" src="/images/hasnain-zaidi.png?v=2" alt="Hasnain Zaidi"><img src="/images/mahzaidex-tech.png" alt="Mahzaidex Tech"></div>
         </div>
     </div>
 
@@ -286,6 +285,8 @@
             </div>
             <form id="peripheralForm">
                 <div class="modal-body">
+                    <div class="form-group" id="perAddModeGroup"><label for="perAddMode">Add mode</label><select id="perAddMode" onchange="updatePeripheralBatchFields()"><option value="single">Single Add</option><option value="batch">Bulk / Batch Add</option></select></div>
+                    <div class="form-group"><label for="perReceiveDate">Receive Date</label><input type="date" id="perReceiveDate"></div>
                     <div class="form-row">
                         <div class="form-group">
                             <label for="perTag">Peripheral Tag *</label>
@@ -324,7 +325,7 @@
                         </div>
                         <div class="form-group">
                             <label for="perQuantity">Quantity</label>
-                            <input type="number" id="perQuantity" min="1" value="1">
+                            <input type="number" id="perQuantity" min="1" value="1" oninput="updatePeripheralBatchFields()">
                         </div>
                     </div>
                     <div class="form-row">
@@ -347,6 +348,7 @@
                             <input type="text" id="perGpuSpecs" placeholder="e.g. Integrated (if applicable)">
                         </div>
                     </div>
+                    <div id="perBatchTags" hidden></div>
                     <div id="perCustomFieldsContainer" style="display: flex; flex-direction: column; gap: 12px;"></div>
                 </div>
                 <div class="modal-footer">

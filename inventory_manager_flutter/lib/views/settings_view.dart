@@ -1,4 +1,3 @@
-import '../widgets/brand_credit.dart';
 import 'ai_settings_view.dart';
 import 'admin_tools_view.dart';
 import 'dart:convert';
@@ -183,8 +182,6 @@ class _SettingsViewState extends State<SettingsView> {
                             DropdownMenuItem(value: i, child: Text(labels[i]))),
                     onChanged: (i) => setState(() => _category = i ?? 0))),
           panels[_category < panels.length ? _category : 0],
-          const SizedBox(height: 24),
-          const BrandCredit(),
         ]);
         return Row(children: [
           if (!compact)

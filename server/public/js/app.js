@@ -1017,7 +1017,6 @@ function renderSettings(container) {
     `;
 
     renderSettingsSubPane();
-    container.insertAdjacentHTML('beforeend', '<footer class="developer-credits brand-credit"><img class="signature-logo" src="/images/hasnain-zaidi.png?v=2" alt="Hasnain Zaidi"><img src="/images/mahzaidex-tech.png" alt="Mahzaidex Tech"></footer>');
 }
 
 function switchSettingsSubTab(subTab) {
@@ -1900,10 +1899,23 @@ async function handleWorkstationFormSubmit(e) {
 
 // Peripheral Modal Handlers
 let editingPeripheralTag = null;
+function updatePeripheralBatchFields() {
+    const batch=!editingPeripheralTag && document.getElementById('perAddMode').value==='batch';
+    const quantity=document.getElementById('perQuantity');
+    quantity.max=batch?'100':'';
+    const holder=document.getElementById('perBatchTags');
+    holder.hidden=!batch;
+    const tag=document.getElementById('perTag');
+    tag.closest('.form-group').hidden=batch;
+    tag.required=!batch;
+    const count=Number(quantity.value);
+    holder.textContent=!batch?'':!Number.isInteger(count)||count<1||count>100?'Enter a quantity from 1 to 100.':count+' individual items will be created. Unique tags are generated automatically using your tag settings when you save.';
+}
 
 function openPeripheralModal(tag = null) {
     if(!canAccess(tag?'edit':'add'))return showToast('Your account does not have this permission.','error');
     editingPeripheralTag = tag;
+    document.getElementById('perBatchTags').innerHTML='';
     const modalTitle = document.getElementById('peripheralModalTitle');
     const form = document.getElementById('peripheralForm');
     form.reset();
@@ -1938,6 +1950,11 @@ function openPeripheralModal(tag = null) {
         const sep = data.settings.tagSeparator || '-';
         document.getElementById('perTag').value = nextAssetTag('peripheral');
     }
+    document.getElementById('perAddModeGroup').hidden=!!tag;
+    document.getElementById('perAddMode').value='single';
+    let fields={};try{fields=JSON.parse(data.peripherals.find(p=>p.peripheralTag===tag)?.customFields||'{}')||{};}catch(_){}
+    document.getElementById('perReceiveDate').value=fields.receiveDate||'';
+    updatePeripheralBatchFields();
     openModal('peripheralModal');
 }
 
@@ -1961,6 +1978,14 @@ async function handlePeripheralFormSubmit(e) {
         gpuSpecs: document.getElementById('perGpuSpecs').value.trim() || null,
     };
 
+    const button=document.getElementById('btnSavePeripheral');
+    if(button.disabled)return;
+    let existingFields={};try{existingFields=JSON.parse(data.peripherals.find(p=>p.peripheralTag===editingPeripheralTag)?.customFields||'{}')||{};}catch(_){}
+    payload.customFields={...existingFields,receiveDate:document.getElementById('perReceiveDate').value||null};
+    const batch=!editingPeripheralTag && document.getElementById('perAddMode').value==='batch';
+    const batchQuantity=Number(document.getElementById('perQuantity').value);
+    if(batch && (!Number.isInteger(batchQuantity)||batchQuantity<1||batchQuantity>100))return showToast('Enter a quantity from 1 to 100.','error');
+    button.disabled=true;
     try {
         if (editingPeripheralTag) {
             await api(`/api/peripherals/${encodeURIComponent(editingPeripheralTag)}`, {
@@ -1968,6 +1993,10 @@ async function handlePeripheralFormSubmit(e) {
                 body: payload
             });
             showToast('Peripheral updated successfully', 'success');
+        } else if(batch) {
+            const {peripheralTag,quantity,...common}=payload;
+            await api('/api/peripherals/batch',{method:'POST',body:{quantity:batchQuantity,common}});
+            showToast(batchQuantity+' individual items created','success');
         } else {
             await api('/api/peripherals', {
                 method: 'POST',
@@ -1978,7 +2007,7 @@ async function handlePeripheralFormSubmit(e) {
         closeModal('peripheralModal');
         await loadAllData();
         switchTab(currentTab);
-    } catch (err) {}
+    } catch (err) {} finally {button.disabled=false;}
 }
 
 // Asset Status Lifecycle

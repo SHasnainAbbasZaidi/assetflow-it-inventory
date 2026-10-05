@@ -1,4 +1,3 @@
-import '../widgets/brand_credit.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -256,8 +255,6 @@ class _LoginViewState extends State<LoginView> {
                                         fontWeight: FontWeight.w600)),
                           ),
                         ),
-                        const SizedBox(height: 36),
-                        const BrandCredit(),
                       ],
                     ),
                   ),
